@@ -28,6 +28,7 @@ export interface UserProfile {
   'wilayahKerja' : string,
   'nomorHp' : string,
   'jabatan' : string,
+  'tandaTangan' : [] | [string],
   'unitKerja' : string,
 }
 export type UserRole = { 'admin' : null } |
@@ -35,6 +36,7 @@ export type UserRole = { 'admin' : null } |
   { 'guest' : null };
 export interface _SERVICE {
   '_initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
+  'addReport' : ActorMethod<[RKHReport], undefined>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
   'createRKHReport' : ActorMethod<
     [
@@ -50,49 +52,35 @@ export interface _SERVICE {
     ],
     RKHReport
   >,
-  'deleteReport' : ActorMethod<[bigint], undefined>,
-  'filterReports' : ActorMethod<
-    [Principal, [] | [string], [] | [string]],
+  'filterReportsByUser' : ActorMethod<[Principal], Array<RKHReport>>,
+  'filterReportsByUserAndMonth' : ActorMethod<
+    [Principal, string],
     Array<RKHReport>
   >,
-  'getAllReports' : ActorMethod<[], Array<RKHReport>>,
+  'filterReportsByUserAndMonthYear' : ActorMethod<
+    [Principal, string, string],
+    Array<RKHReport>
+  >,
+  'filterReportsByUserAndYear' : ActorMethod<
+    [Principal, string],
+    Array<RKHReport>
+  >,
   'getAllUserProfiles' : ActorMethod<[], Array<UserProfile>>,
   'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
-  'getMyProfile' : ActorMethod<[], [] | [UserProfile]>,
-  'getMyReports' : ActorMethod<[], Array<RKHReport>>,
   'getReportById' : ActorMethod<[bigint], RKHReport>,
+  'getReports' : ActorMethod<[], Array<RKHReport>>,
   'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
-  'queryRKHReports' : ActorMethod<
-    [
-      {
-        'tahun' : [] | [string],
-        'tanggal' : [] | [string],
-        'user' : [] | [Principal],
-        'bulan' : [] | [string],
-      },
-    ],
+  'isValidNumaiIndicator' : ActorMethod<[Array<bigint>], boolean>,
+  'queryReports' : ActorMethod<
+    [[] | [string], [] | [string], [] | [string], [] | [Principal]],
     Array<RKHReport>
   >,
+  'queryReportsYearly' : ActorMethod<[string], Array<RKHReport>>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
   'setUserRole' : ActorMethod<[Principal, UserRole], undefined>,
-  'updateMyProfile' : ActorMethod<[UserProfile], undefined>,
-  'updateReport' : ActorMethod<
-    [
-      bigint,
-      {
-        'hasilKegiatan' : string,
-        'kegiatan' : string,
-        'tanggal' : string,
-        'lokasi' : string,
-        'keterangan' : [] | [string],
-        'jumlahSasaran' : bigint,
-        'sasaran' : string,
-      },
-    ],
-    RKHReport
-  >,
+  'updateReport' : ActorMethod<[Array<RKHReport>], undefined>,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];

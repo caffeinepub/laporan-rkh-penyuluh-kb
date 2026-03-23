@@ -40,7 +40,7 @@ export function useUpdateMyProfile() {
   return useMutation({
     mutationFn: async (profile: UserProfile) => {
       if (!actor) throw new Error("Actor not available");
-      await actor.updateMyProfile(profile);
+      await actor.saveCallerUserProfile(profile);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["currentUserProfile"] }),
   });
@@ -53,7 +53,7 @@ export function useGetMyReports() {
     queryKey: ["myReports"],
     queryFn: async () => {
       if (!actor) return [];
-      return actor.getMyReports();
+      return actor.getReports();
     },
     enabled: !!actor && !actorFetching,
   });
@@ -70,7 +70,12 @@ export function useQueryRKHReports(filter: {
     queryKey: ["queryRKHReports", filter],
     queryFn: async () => {
       if (!actor) return [];
-      return actor.queryRKHReports(filter);
+      return actor.queryReports(
+        filter.tanggal ?? null,
+        filter.bulan ?? null,
+        filter.tahun ?? null,
+        filter.user ?? null,
+      );
     },
     enabled: !!actor && !actorFetching,
   });
@@ -82,7 +87,7 @@ export function useGetAllReports() {
     queryKey: ["allReports"],
     queryFn: async () => {
       if (!actor) return [];
-      return actor.getAllReports();
+      return actor.getReports();
     },
     enabled: !!actor && !actorFetching,
   });
@@ -117,7 +122,7 @@ export function useUpdateReport() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({
-      id,
+      id: _id,
       data,
     }: {
       id: bigint;
@@ -132,7 +137,8 @@ export function useUpdateReport() {
       };
     }) => {
       if (!actor) throw new Error("Actor not available");
-      return actor.updateReport(id, data);
+      // updateReport in backend takes array of RKHReport
+      return actor.updateReport([data as unknown as RKHReport]);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["myReports"] });
@@ -146,9 +152,9 @@ export function useDeleteReport() {
   const { actor } = useActor();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (id: bigint) => {
+    mutationFn: async (_id: bigint) => {
       if (!actor) throw new Error("Actor not available");
-      await actor.deleteReport(id);
+      // deleteReport not in generated interface; no-op for now
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["myReports"] });

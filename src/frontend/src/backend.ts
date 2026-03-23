@@ -107,6 +107,7 @@ export interface UserProfile {
     wilayahKerja: string;
     nomorHp: string;
     jabatan: string;
+    tandaTangan?: string;
     unitKerja: string;
 }
 export enum UserRole {
@@ -116,8 +117,9 @@ export enum UserRole {
 }
 export interface backendInterface {
     _initializeAccessControlWithSecret(userSecret: string): Promise<void>;
+    addReport(report: RKHReport): Promise<void>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
-    createRKHReport(reportInput: {
+    createRKHReport(input: {
         hasilKegiatan: string;
         kegiatan: string;
         tanggal: string;
@@ -126,35 +128,23 @@ export interface backendInterface {
         jumlahSasaran: bigint;
         sasaran: string;
     }): Promise<RKHReport>;
-    deleteReport(reportId: bigint): Promise<void>;
-    filterReports(user: Principal, monthFilter: string | null, yearFilter: string | null): Promise<Array<RKHReport>>;
-    getAllReports(): Promise<Array<RKHReport>>;
+    filterReportsByUser(user: Principal): Promise<Array<RKHReport>>;
+    filterReportsByUserAndMonth(user: Principal, month: string): Promise<Array<RKHReport>>;
+    filterReportsByUserAndMonthYear(user: Principal, month: string, year: string): Promise<Array<RKHReport>>;
+    filterReportsByUserAndYear(user: Principal, year: string): Promise<Array<RKHReport>>;
     getAllUserProfiles(): Promise<Array<UserProfile>>;
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
-    getMyProfile(): Promise<UserProfile | null>;
-    getMyReports(): Promise<Array<RKHReport>>;
     getReportById(reportId: bigint): Promise<RKHReport>;
+    getReports(): Promise<Array<RKHReport>>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
     isCallerAdmin(): Promise<boolean>;
-    queryRKHReports(filter: {
-        tahun?: string;
-        tanggal?: string;
-        user?: Principal;
-        bulan?: string;
-    }): Promise<Array<RKHReport>>;
+    isValidNumaiIndicator(numaiIndicator: Array<bigint>): Promise<boolean>;
+    queryReports(tanggal: string | null, bulan: string | null, tahun: string | null, user: Principal | null): Promise<Array<RKHReport>>;
+    queryReportsYearly(filterYear: string): Promise<Array<RKHReport>>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     setUserRole(user: Principal, newRole: UserRole): Promise<void>;
-    updateMyProfile(profile: UserProfile): Promise<void>;
-    updateReport(reportId: bigint, updatedData: {
-        hasilKegiatan: string;
-        kegiatan: string;
-        tanggal: string;
-        lokasi: string;
-        keterangan?: string;
-        jumlahSasaran: bigint;
-        sasaran: string;
-    }): Promise<RKHReport>;
+    updateReport(reports: Array<RKHReport>): Promise<void>;
 }
 import type { RKHReport as _RKHReport, UserProfile as _UserProfile, UserRole as _UserRole } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
@@ -173,17 +163,31 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async assignCallerUserRole(arg0: Principal, arg1: UserRole): Promise<void> {
+    async addReport(arg0: RKHReport): Promise<void> {
         if (this.processError) {
             try {
-                const result = await this.actor.assignCallerUserRole(arg0, to_candid_UserRole_n1(this._uploadFile, this._downloadFile, arg1));
+                const result = await this.actor.addReport(to_candid_RKHReport_n1(this._uploadFile, this._downloadFile, arg0));
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.assignCallerUserRole(arg0, to_candid_UserRole_n1(this._uploadFile, this._downloadFile, arg1));
+            const result = await this.actor.addReport(to_candid_RKHReport_n1(this._uploadFile, this._downloadFile, arg0));
+            return result;
+        }
+    }
+    async assignCallerUserRole(arg0: Principal, arg1: UserRole): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.assignCallerUserRole(arg0, to_candid_UserRole_n3(this._uploadFile, this._downloadFile, arg1));
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.assignCallerUserRole(arg0, to_candid_UserRole_n3(this._uploadFile, this._downloadFile, arg1));
             return result;
         }
     }
@@ -198,155 +202,155 @@ export class Backend implements backendInterface {
     }): Promise<RKHReport> {
         if (this.processError) {
             try {
-                const result = await this.actor.createRKHReport(to_candid_record_n3(this._uploadFile, this._downloadFile, arg0));
-                return from_candid_RKHReport_n4(this._uploadFile, this._downloadFile, result);
+                const result = await this.actor.createRKHReport(to_candid_record_n5(this._uploadFile, this._downloadFile, arg0));
+                return from_candid_RKHReport_n6(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.createRKHReport(to_candid_record_n3(this._uploadFile, this._downloadFile, arg0));
-            return from_candid_RKHReport_n4(this._uploadFile, this._downloadFile, result);
+            const result = await this.actor.createRKHReport(to_candid_record_n5(this._uploadFile, this._downloadFile, arg0));
+            return from_candid_RKHReport_n6(this._uploadFile, this._downloadFile, result);
         }
     }
-    async deleteReport(arg0: bigint): Promise<void> {
+    async filterReportsByUser(arg0: Principal): Promise<Array<RKHReport>> {
         if (this.processError) {
             try {
-                const result = await this.actor.deleteReport(arg0);
-                return result;
+                const result = await this.actor.filterReportsByUser(arg0);
+                return from_candid_vec_n9(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.deleteReport(arg0);
-            return result;
+            const result = await this.actor.filterReportsByUser(arg0);
+            return from_candid_vec_n9(this._uploadFile, this._downloadFile, result);
         }
     }
-    async filterReports(arg0: Principal, arg1: string | null, arg2: string | null): Promise<Array<RKHReport>> {
+    async filterReportsByUserAndMonth(arg0: Principal, arg1: string): Promise<Array<RKHReport>> {
         if (this.processError) {
             try {
-                const result = await this.actor.filterReports(arg0, to_candid_opt_n7(this._uploadFile, this._downloadFile, arg1), to_candid_opt_n7(this._uploadFile, this._downloadFile, arg2));
-                return from_candid_vec_n8(this._uploadFile, this._downloadFile, result);
+                const result = await this.actor.filterReportsByUserAndMonth(arg0, arg1);
+                return from_candid_vec_n9(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.filterReports(arg0, to_candid_opt_n7(this._uploadFile, this._downloadFile, arg1), to_candid_opt_n7(this._uploadFile, this._downloadFile, arg2));
-            return from_candid_vec_n8(this._uploadFile, this._downloadFile, result);
+            const result = await this.actor.filterReportsByUserAndMonth(arg0, arg1);
+            return from_candid_vec_n9(this._uploadFile, this._downloadFile, result);
         }
     }
-    async getAllReports(): Promise<Array<RKHReport>> {
+    async filterReportsByUserAndMonthYear(arg0: Principal, arg1: string, arg2: string): Promise<Array<RKHReport>> {
         if (this.processError) {
             try {
-                const result = await this.actor.getAllReports();
-                return from_candid_vec_n8(this._uploadFile, this._downloadFile, result);
+                const result = await this.actor.filterReportsByUserAndMonthYear(arg0, arg1, arg2);
+                return from_candid_vec_n9(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.getAllReports();
-            return from_candid_vec_n8(this._uploadFile, this._downloadFile, result);
+            const result = await this.actor.filterReportsByUserAndMonthYear(arg0, arg1, arg2);
+            return from_candid_vec_n9(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async filterReportsByUserAndYear(arg0: Principal, arg1: string): Promise<Array<RKHReport>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.filterReportsByUserAndYear(arg0, arg1);
+                return from_candid_vec_n9(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.filterReportsByUserAndYear(arg0, arg1);
+            return from_candid_vec_n9(this._uploadFile, this._downloadFile, result);
         }
     }
     async getAllUserProfiles(): Promise<Array<UserProfile>> {
         if (this.processError) {
             try {
                 const result = await this.actor.getAllUserProfiles();
-                return result;
+                return from_candid_vec_n10(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.getAllUserProfiles();
-            return result;
+            return from_candid_vec_n10(this._uploadFile, this._downloadFile, result);
         }
     }
     async getCallerUserProfile(): Promise<UserProfile | null> {
         if (this.processError) {
             try {
                 const result = await this.actor.getCallerUserProfile();
-                return from_candid_opt_n9(this._uploadFile, this._downloadFile, result);
+                return from_candid_opt_n13(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.getCallerUserProfile();
-            return from_candid_opt_n9(this._uploadFile, this._downloadFile, result);
+            return from_candid_opt_n13(this._uploadFile, this._downloadFile, result);
         }
     }
     async getCallerUserRole(): Promise<UserRole> {
         if (this.processError) {
             try {
                 const result = await this.actor.getCallerUserRole();
-                return from_candid_UserRole_n10(this._uploadFile, this._downloadFile, result);
+                return from_candid_UserRole_n14(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.getCallerUserRole();
-            return from_candid_UserRole_n10(this._uploadFile, this._downloadFile, result);
-        }
-    }
-    async getMyProfile(): Promise<UserProfile | null> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.getMyProfile();
-                return from_candid_opt_n9(this._uploadFile, this._downloadFile, result);
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.getMyProfile();
-            return from_candid_opt_n9(this._uploadFile, this._downloadFile, result);
-        }
-    }
-    async getMyReports(): Promise<Array<RKHReport>> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.getMyReports();
-                return from_candid_vec_n8(this._uploadFile, this._downloadFile, result);
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.getMyReports();
-            return from_candid_vec_n8(this._uploadFile, this._downloadFile, result);
+            return from_candid_UserRole_n14(this._uploadFile, this._downloadFile, result);
         }
     }
     async getReportById(arg0: bigint): Promise<RKHReport> {
         if (this.processError) {
             try {
                 const result = await this.actor.getReportById(arg0);
-                return from_candid_RKHReport_n4(this._uploadFile, this._downloadFile, result);
+                return from_candid_RKHReport_n6(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.getReportById(arg0);
-            return from_candid_RKHReport_n4(this._uploadFile, this._downloadFile, result);
+            return from_candid_RKHReport_n6(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async getReports(): Promise<Array<RKHReport>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getReports();
+                return from_candid_vec_n9(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getReports();
+            return from_candid_vec_n9(this._uploadFile, this._downloadFile, result);
         }
     }
     async getUserProfile(arg0: Principal): Promise<UserProfile | null> {
         if (this.processError) {
             try {
                 const result = await this.actor.getUserProfile(arg0);
-                return from_candid_opt_n9(this._uploadFile, this._downloadFile, result);
+                return from_candid_opt_n13(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.getUserProfile(arg0);
-            return from_candid_opt_n9(this._uploadFile, this._downloadFile, result);
+            return from_candid_opt_n13(this._uploadFile, this._downloadFile, result);
         }
     }
     async isCallerAdmin(): Promise<boolean> {
@@ -363,103 +367,134 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async queryRKHReports(arg0: {
-        tahun?: string;
-        tanggal?: string;
-        user?: Principal;
-        bulan?: string;
-    }): Promise<Array<RKHReport>> {
+    async isValidNumaiIndicator(arg0: Array<bigint>): Promise<boolean> {
         if (this.processError) {
             try {
-                const result = await this.actor.queryRKHReports(to_candid_record_n12(this._uploadFile, this._downloadFile, arg0));
-                return from_candid_vec_n8(this._uploadFile, this._downloadFile, result);
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.queryRKHReports(to_candid_record_n12(this._uploadFile, this._downloadFile, arg0));
-            return from_candid_vec_n8(this._uploadFile, this._downloadFile, result);
-        }
-    }
-    async saveCallerUserProfile(arg0: UserProfile): Promise<void> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.saveCallerUserProfile(arg0);
+                const result = await this.actor.isValidNumaiIndicator(arg0);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.saveCallerUserProfile(arg0);
+            const result = await this.actor.isValidNumaiIndicator(arg0);
+            return result;
+        }
+    }
+    async queryReports(arg0: string | null, arg1: string | null, arg2: string | null, arg3: Principal | null): Promise<Array<RKHReport>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.queryReports(to_candid_opt_n16(this._uploadFile, this._downloadFile, arg0), to_candid_opt_n16(this._uploadFile, this._downloadFile, arg1), to_candid_opt_n16(this._uploadFile, this._downloadFile, arg2), to_candid_opt_n17(this._uploadFile, this._downloadFile, arg3));
+                return from_candid_vec_n9(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.queryReports(to_candid_opt_n16(this._uploadFile, this._downloadFile, arg0), to_candid_opt_n16(this._uploadFile, this._downloadFile, arg1), to_candid_opt_n16(this._uploadFile, this._downloadFile, arg2), to_candid_opt_n17(this._uploadFile, this._downloadFile, arg3));
+            return from_candid_vec_n9(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async queryReportsYearly(arg0: string): Promise<Array<RKHReport>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.queryReportsYearly(arg0);
+                return from_candid_vec_n9(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.queryReportsYearly(arg0);
+            return from_candid_vec_n9(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async saveCallerUserProfile(arg0: UserProfile): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.saveCallerUserProfile(to_candid_UserProfile_n18(this._uploadFile, this._downloadFile, arg0));
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.saveCallerUserProfile(to_candid_UserProfile_n18(this._uploadFile, this._downloadFile, arg0));
             return result;
         }
     }
     async setUserRole(arg0: Principal, arg1: UserRole): Promise<void> {
         if (this.processError) {
             try {
-                const result = await this.actor.setUserRole(arg0, to_candid_UserRole_n1(this._uploadFile, this._downloadFile, arg1));
+                const result = await this.actor.setUserRole(arg0, to_candid_UserRole_n3(this._uploadFile, this._downloadFile, arg1));
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.setUserRole(arg0, to_candid_UserRole_n1(this._uploadFile, this._downloadFile, arg1));
+            const result = await this.actor.setUserRole(arg0, to_candid_UserRole_n3(this._uploadFile, this._downloadFile, arg1));
             return result;
         }
     }
-    async updateMyProfile(arg0: UserProfile): Promise<void> {
+    async updateReport(arg0: Array<RKHReport>): Promise<void> {
         if (this.processError) {
             try {
-                const result = await this.actor.updateMyProfile(arg0);
+                const result = await this.actor.updateReport(to_candid_vec_n20(this._uploadFile, this._downloadFile, arg0));
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.updateMyProfile(arg0);
+            const result = await this.actor.updateReport(to_candid_vec_n20(this._uploadFile, this._downloadFile, arg0));
             return result;
         }
     }
-    async updateReport(arg0: bigint, arg1: {
-        hasilKegiatan: string;
-        kegiatan: string;
-        tanggal: string;
-        lokasi: string;
-        keterangan?: string;
-        jumlahSasaran: bigint;
-        sasaran: string;
-    }): Promise<RKHReport> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.updateReport(arg0, to_candid_record_n3(this._uploadFile, this._downloadFile, arg1));
-                return from_candid_RKHReport_n4(this._uploadFile, this._downloadFile, result);
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.updateReport(arg0, to_candid_record_n3(this._uploadFile, this._downloadFile, arg1));
-            return from_candid_RKHReport_n4(this._uploadFile, this._downloadFile, result);
-        }
-    }
 }
-function from_candid_RKHReport_n4(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _RKHReport): RKHReport {
-    return from_candid_record_n5(_uploadFile, _downloadFile, value);
+function from_candid_RKHReport_n6(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _RKHReport): RKHReport {
+    return from_candid_record_n7(_uploadFile, _downloadFile, value);
 }
-function from_candid_UserRole_n10(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _UserRole): UserRole {
-    return from_candid_variant_n11(_uploadFile, _downloadFile, value);
+function from_candid_UserProfile_n11(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _UserProfile): UserProfile {
+    return from_candid_record_n12(_uploadFile, _downloadFile, value);
 }
-function from_candid_opt_n6(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [string]): string | null {
+function from_candid_UserRole_n14(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _UserRole): UserRole {
+    return from_candid_variant_n15(_uploadFile, _downloadFile, value);
+}
+function from_candid_opt_n13(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_UserProfile]): UserProfile | null {
+    return value.length === 0 ? null : from_candid_UserProfile_n11(_uploadFile, _downloadFile, value[0]);
+}
+function from_candid_opt_n8(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [string]): string | null {
     return value.length === 0 ? null : value[0];
 }
-function from_candid_opt_n9(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_UserProfile]): UserProfile | null {
-    return value.length === 0 ? null : value[0];
+function from_candid_record_n12(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    nip: string;
+    nama: string;
+    wilayahKerja: string;
+    nomorHp: string;
+    jabatan: string;
+    tandaTangan: [] | [string];
+    unitKerja: string;
+}): {
+    nip: string;
+    nama: string;
+    wilayahKerja: string;
+    nomorHp: string;
+    jabatan: string;
+    tandaTangan?: string;
+    unitKerja: string;
+} {
+    return {
+        nip: value.nip,
+        nama: value.nama,
+        wilayahKerja: value.wilayahKerja,
+        nomorHp: value.nomorHp,
+        jabatan: value.jabatan,
+        tandaTangan: record_opt_to_undefined(from_candid_opt_n8(_uploadFile, _downloadFile, value.tandaTangan)),
+        unitKerja: value.unitKerja
+    };
 }
-function from_candid_record_n5(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function from_candid_record_n7(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     id: bigint;
     hasilKegiatan: string;
     kegiatan: string;
@@ -490,12 +525,12 @@ function from_candid_record_n5(_uploadFile: (file: ExternalBlob) => Promise<Uint
         createdAt: value.createdAt,
         user: value.user,
         lokasi: value.lokasi,
-        keterangan: record_opt_to_undefined(from_candid_opt_n6(_uploadFile, _downloadFile, value.keterangan)),
+        keterangan: record_opt_to_undefined(from_candid_opt_n8(_uploadFile, _downloadFile, value.keterangan)),
         jumlahSasaran: value.jumlahSasaran,
         sasaran: value.sasaran
     };
 }
-function from_candid_variant_n11(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function from_candid_variant_n15(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     admin: null;
 } | {
     user: null;
@@ -504,34 +539,91 @@ function from_candid_variant_n11(_uploadFile: (file: ExternalBlob) => Promise<Ui
 }): UserRole {
     return "admin" in value ? UserRole.admin : "user" in value ? UserRole.user : "guest" in value ? UserRole.guest : value;
 }
-function from_candid_vec_n8(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_RKHReport>): Array<RKHReport> {
-    return value.map((x)=>from_candid_RKHReport_n4(_uploadFile, _downloadFile, x));
+function from_candid_vec_n10(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_UserProfile>): Array<UserProfile> {
+    return value.map((x)=>from_candid_UserProfile_n11(_uploadFile, _downloadFile, x));
 }
-function to_candid_UserRole_n1(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: UserRole): _UserRole {
-    return to_candid_variant_n2(_uploadFile, _downloadFile, value);
+function from_candid_vec_n9(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_RKHReport>): Array<RKHReport> {
+    return value.map((x)=>from_candid_RKHReport_n6(_uploadFile, _downloadFile, x));
 }
-function to_candid_opt_n7(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: string | null): [] | [string] {
+function to_candid_RKHReport_n1(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: RKHReport): _RKHReport {
+    return to_candid_record_n2(_uploadFile, _downloadFile, value);
+}
+function to_candid_UserProfile_n18(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: UserProfile): _UserProfile {
+    return to_candid_record_n19(_uploadFile, _downloadFile, value);
+}
+function to_candid_UserRole_n3(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: UserRole): _UserRole {
+    return to_candid_variant_n4(_uploadFile, _downloadFile, value);
+}
+function to_candid_opt_n16(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: string | null): [] | [string] {
     return value === null ? candid_none() : candid_some(value);
 }
-function to_candid_record_n12(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
-    tahun?: string;
-    tanggal?: string;
-    user?: Principal;
-    bulan?: string;
+function to_candid_opt_n17(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Principal | null): [] | [Principal] {
+    return value === null ? candid_none() : candid_some(value);
+}
+function to_candid_record_n19(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    nip: string;
+    nama: string;
+    wilayahKerja: string;
+    nomorHp: string;
+    jabatan: string;
+    tandaTangan?: string;
+    unitKerja: string;
 }): {
-    tahun: [] | [string];
-    tanggal: [] | [string];
-    user: [] | [Principal];
-    bulan: [] | [string];
+    nip: string;
+    nama: string;
+    wilayahKerja: string;
+    nomorHp: string;
+    jabatan: string;
+    tandaTangan: [] | [string];
+    unitKerja: string;
 } {
     return {
-        tahun: value.tahun ? candid_some(value.tahun) : candid_none(),
-        tanggal: value.tanggal ? candid_some(value.tanggal) : candid_none(),
-        user: value.user ? candid_some(value.user) : candid_none(),
-        bulan: value.bulan ? candid_some(value.bulan) : candid_none()
+        nip: value.nip,
+        nama: value.nama,
+        wilayahKerja: value.wilayahKerja,
+        nomorHp: value.nomorHp,
+        jabatan: value.jabatan,
+        tandaTangan: value.tandaTangan ? candid_some(value.tandaTangan) : candid_none(),
+        unitKerja: value.unitKerja
     };
 }
-function to_candid_record_n3(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function to_candid_record_n2(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    id: bigint;
+    hasilKegiatan: string;
+    kegiatan: string;
+    tanggal: string;
+    createdAt: bigint;
+    user: Principal;
+    lokasi: string;
+    keterangan?: string;
+    jumlahSasaran: bigint;
+    sasaran: string;
+}): {
+    id: bigint;
+    hasilKegiatan: string;
+    kegiatan: string;
+    tanggal: string;
+    createdAt: bigint;
+    user: Principal;
+    lokasi: string;
+    keterangan: [] | [string];
+    jumlahSasaran: bigint;
+    sasaran: string;
+} {
+    return {
+        id: value.id,
+        hasilKegiatan: value.hasilKegiatan,
+        kegiatan: value.kegiatan,
+        tanggal: value.tanggal,
+        createdAt: value.createdAt,
+        user: value.user,
+        lokasi: value.lokasi,
+        keterangan: value.keterangan ? candid_some(value.keterangan) : candid_none(),
+        jumlahSasaran: value.jumlahSasaran,
+        sasaran: value.sasaran
+    };
+}
+function to_candid_record_n5(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     hasilKegiatan: string;
     kegiatan: string;
     tanggal: string;
@@ -558,7 +650,7 @@ function to_candid_record_n3(_uploadFile: (file: ExternalBlob) => Promise<Uint8A
         sasaran: value.sasaran
     };
 }
-function to_candid_variant_n2(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: UserRole): {
+function to_candid_variant_n4(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: UserRole): {
     admin: null;
 } | {
     user: null;
@@ -572,6 +664,9 @@ function to_candid_variant_n2(_uploadFile: (file: ExternalBlob) => Promise<Uint8
     } : value == UserRole.guest ? {
         guest: null
     } : value;
+}
+function to_candid_vec_n20(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<RKHReport>): Array<_RKHReport> {
+    return value.map((x)=>to_candid_RKHReport_n1(_uploadFile, _downloadFile, x));
 }
 export interface CreateActorOptions {
     agent?: Agent;

@@ -1,8 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, User } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Loader2, PenLine, Trash2, Upload, User } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   useGetCallerUserProfile,
@@ -12,6 +12,7 @@ import {
 export default function ProfilPage() {
   const { data: profile, isLoading } = useGetCallerUserProfile();
   const updateMutation = useUpdateMyProfile();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState({
     nama: "",
@@ -20,6 +21,7 @@ export default function ProfilPage() {
     unitKerja: "",
     wilayahKerja: "",
     nomorHp: "",
+    tandaTangan: "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -32,6 +34,7 @@ export default function ProfilPage() {
         unitKerja: profile.unitKerja,
         wilayahKerja: profile.wilayahKerja,
         nomorHp: profile.nomorHp,
+        tandaTangan: profile.tandaTangan ?? "",
       });
     }
   }, [profile]);
@@ -47,6 +50,18 @@ export default function ProfilPage() {
     return e;
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const result = ev.target?.result as string;
+      setForm((f) => ({ ...f, tandaTangan: result }));
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const errs = validate();
@@ -55,7 +70,15 @@ export default function ProfilPage() {
       return;
     }
     try {
-      await updateMutation.mutateAsync(form);
+      await updateMutation.mutateAsync({
+        nama: form.nama,
+        nip: form.nip,
+        jabatan: form.jabatan,
+        unitKerja: form.unitKerja,
+        wilayahKerja: form.wilayahKerja,
+        nomorHp: form.nomorHp,
+        tandaTangan: form.tandaTangan || undefined,
+      });
       toast.success("Profil berhasil diperbarui!");
     } catch {
       toast.error("Gagal memperbarui profil.");
@@ -149,6 +172,116 @@ export default function ProfilPage() {
               )}
             </div>
           ))}
+        </div>
+
+        {/* Tanda Tangan Section */}
+        <div className="mt-6 border border-brand-border rounded-lg p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <PenLine size={16} className="text-brand-green" />
+            <Label className="text-sm font-semibold text-brand-nav">
+              Tanda Tangan
+            </Label>
+          </div>
+
+          {form.tandaTangan ? (
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+              <div
+                style={{
+                  background: "#000",
+                  border: "2px solid #333",
+                  borderRadius: "6px",
+                  padding: "8px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  minWidth: "160px",
+                  minHeight: "80px",
+                }}
+              >
+                <img
+                  src={form.tandaTangan}
+                  alt="Tanda Tangan"
+                  style={{
+                    maxWidth: "140px",
+                    maxHeight: "64px",
+                    objectFit: "contain",
+                  }}
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <p className="text-xs text-brand-muted">
+                  Tanda tangan berhasil diunggah
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    data-ocid="profil.tanda_tangan.upload_button"
+                    variant="outline"
+                    size="sm"
+                    className="text-xs"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Upload size={13} className="mr-1" />
+                    Ganti
+                  </Button>
+                  <Button
+                    type="button"
+                    data-ocid="profil.tanda_tangan.delete_button"
+                    variant="outline"
+                    size="sm"
+                    className="text-xs text-red-500 border-red-200 hover:bg-red-50"
+                    onClick={() => setForm((f) => ({ ...f, tandaTangan: "" }))}
+                  >
+                    <Trash2 size={13} className="mr-1" />
+                    Hapus
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col items-start gap-2">
+              <div
+                style={{
+                  background: "#f9fafb",
+                  border: "2px dashed #ccc",
+                  borderRadius: "6px",
+                  padding: "16px 24px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  minWidth: "160px",
+                  minHeight: "80px",
+                  color: "#aaa",
+                  fontSize: "12px",
+                }}
+              >
+                Belum ada tanda tangan
+              </div>
+              <Button
+                type="button"
+                data-ocid="profil.tanda_tangan.upload_button"
+                variant="outline"
+                size="sm"
+                className="text-xs mt-1"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Upload size={13} className="mr-1" />
+                Upload Tanda Tangan
+              </Button>
+            </div>
+          )}
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleFileChange}
+          />
+          <p className="text-xs text-brand-muted mt-2">
+            Format: JPG, PNG, atau GIF. Disarankan menggunakan tanda tangan
+            dengan latar belakang transparan atau putih.
+          </p>
         </div>
 
         <div className="mt-6 flex gap-3">

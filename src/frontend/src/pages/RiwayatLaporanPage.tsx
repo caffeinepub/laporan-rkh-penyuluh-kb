@@ -40,6 +40,7 @@ export default function RiwayatLaporanPage({ profile }: RiwayatProps) {
 
   const handlePrint = () => window.print();
   const bulanName = formatMonthYear(bulan, tahun);
+  const tandaTangan = profile?.tandaTangan ?? null;
 
   return (
     <>
@@ -382,6 +383,7 @@ export default function RiwayatLaporanPage({ profile }: RiwayatProps) {
           </tbody>
         </table>
 
+        {/* Signature block */}
         <div
           style={{
             display: "flex",
@@ -390,19 +392,51 @@ export default function RiwayatLaporanPage({ profile }: RiwayatProps) {
           }}
         >
           <div style={{ textAlign: "center", minWidth: "200px" }}>
-            <p style={{ marginBottom: "4px" }}>Mengetahui,</p>
-            <p style={{ marginBottom: "4px" }}>Koordinator Penyuluh KB</p>
-            <div style={{ height: "64px" }} />
+            <p style={{ marginBottom: "2px" }}>Mengetahui,</p>
+            <p style={{ marginBottom: "8px" }}>Koordinator Penyuluh KB</p>
+
+            {/* Signature image box - black box with signature */}
+            <div
+              style={{
+                width: "120px",
+                height: "60px",
+                border: "2px solid #000",
+                margin: "0 auto 4px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: tandaTangan ? "#000" : "transparent",
+                overflow: "hidden",
+              }}
+            >
+              {tandaTangan && (
+                <img
+                  src={tandaTangan}
+                  alt="Tanda Tangan"
+                  style={{
+                    maxWidth: "120px",
+                    maxHeight: "60px",
+                    objectFit: "contain",
+                  }}
+                />
+              )}
+            </div>
+
             <p
               style={{
                 fontWeight: "bold",
                 borderTop: "1px solid #000",
                 paddingTop: "4px",
+                marginTop: "4px",
+                marginBottom: 0,
               }}
             >
               {profile?.nama ?? "_____________________"}
             </p>
-            <p>NIP: {profile?.nip ?? "_____________________"}</p>
+            <p style={{ margin: 0 }}>
+              NIP: {profile?.nip ?? "_____________________"}
+            </p>
+            {profile?.jabatan && <p style={{ margin: 0 }}>{profile.jabatan}</p>}
           </div>
         </div>
       </div>

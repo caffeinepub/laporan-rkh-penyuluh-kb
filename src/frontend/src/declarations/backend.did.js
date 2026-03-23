@@ -8,11 +8,6 @@
 
 import { IDL } from '@icp-sdk/core/candid';
 
-export const UserRole = IDL.Variant({
-  'admin' : IDL.Null,
-  'user' : IDL.Null,
-  'guest' : IDL.Null,
-});
 export const RKHReport = IDL.Record({
   'id' : IDL.Nat,
   'hasilKegiatan' : IDL.Text,
@@ -25,17 +20,24 @@ export const RKHReport = IDL.Record({
   'jumlahSasaran' : IDL.Nat,
   'sasaran' : IDL.Text,
 });
+export const UserRole = IDL.Variant({
+  'admin' : IDL.Null,
+  'user' : IDL.Null,
+  'guest' : IDL.Null,
+});
 export const UserProfile = IDL.Record({
   'nip' : IDL.Text,
   'nama' : IDL.Text,
   'wilayahKerja' : IDL.Text,
   'nomorHp' : IDL.Text,
   'jabatan' : IDL.Text,
+  'tandaTangan' : IDL.Opt(IDL.Text),
   'unitKerja' : IDL.Text,
 });
 
 export const idlService = IDL.Service({
   '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
+  'addReport' : IDL.Func([RKHReport], [], []),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
   'createRKHReport' : IDL.Func(
       [
@@ -52,66 +54,57 @@ export const idlService = IDL.Service({
       [RKHReport],
       [],
     ),
-  'deleteReport' : IDL.Func([IDL.Nat], [], []),
-  'filterReports' : IDL.Func(
-      [IDL.Principal, IDL.Opt(IDL.Text), IDL.Opt(IDL.Text)],
+  'filterReportsByUser' : IDL.Func(
+      [IDL.Principal],
       [IDL.Vec(RKHReport)],
       ['query'],
     ),
-  'getAllReports' : IDL.Func([], [IDL.Vec(RKHReport)], ['query']),
+  'filterReportsByUserAndMonth' : IDL.Func(
+      [IDL.Principal, IDL.Text],
+      [IDL.Vec(RKHReport)],
+      ['query'],
+    ),
+  'filterReportsByUserAndMonthYear' : IDL.Func(
+      [IDL.Principal, IDL.Text, IDL.Text],
+      [IDL.Vec(RKHReport)],
+      ['query'],
+    ),
+  'filterReportsByUserAndYear' : IDL.Func(
+      [IDL.Principal, IDL.Text],
+      [IDL.Vec(RKHReport)],
+      ['query'],
+    ),
   'getAllUserProfiles' : IDL.Func([], [IDL.Vec(UserProfile)], ['query']),
   'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
   'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
-  'getMyProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
-  'getMyReports' : IDL.Func([], [IDL.Vec(RKHReport)], ['query']),
   'getReportById' : IDL.Func([IDL.Nat], [RKHReport], ['query']),
+  'getReports' : IDL.Func([], [IDL.Vec(RKHReport)], ['query']),
   'getUserProfile' : IDL.Func(
       [IDL.Principal],
       [IDL.Opt(UserProfile)],
       ['query'],
     ),
   'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
-  'queryRKHReports' : IDL.Func(
+  'isValidNumaiIndicator' : IDL.Func([IDL.Vec(IDL.Int)], [IDL.Bool], []),
+  'queryReports' : IDL.Func(
       [
-        IDL.Record({
-          'tahun' : IDL.Opt(IDL.Text),
-          'tanggal' : IDL.Opt(IDL.Text),
-          'user' : IDL.Opt(IDL.Principal),
-          'bulan' : IDL.Opt(IDL.Text),
-        }),
+        IDL.Opt(IDL.Text),
+        IDL.Opt(IDL.Text),
+        IDL.Opt(IDL.Text),
+        IDL.Opt(IDL.Principal),
       ],
       [IDL.Vec(RKHReport)],
       ['query'],
     ),
+  'queryReportsYearly' : IDL.Func([IDL.Text], [IDL.Vec(RKHReport)], ['query']),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
   'setUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
-  'updateMyProfile' : IDL.Func([UserProfile], [], []),
-  'updateReport' : IDL.Func(
-      [
-        IDL.Nat,
-        IDL.Record({
-          'hasilKegiatan' : IDL.Text,
-          'kegiatan' : IDL.Text,
-          'tanggal' : IDL.Text,
-          'lokasi' : IDL.Text,
-          'keterangan' : IDL.Opt(IDL.Text),
-          'jumlahSasaran' : IDL.Nat,
-          'sasaran' : IDL.Text,
-        }),
-      ],
-      [RKHReport],
-      [],
-    ),
+  'updateReport' : IDL.Func([IDL.Vec(RKHReport)], [], []),
 });
 
 export const idlInitArgs = [];
 
 export const idlFactory = ({ IDL }) => {
-  const UserRole = IDL.Variant({
-    'admin' : IDL.Null,
-    'user' : IDL.Null,
-    'guest' : IDL.Null,
-  });
   const RKHReport = IDL.Record({
     'id' : IDL.Nat,
     'hasilKegiatan' : IDL.Text,
@@ -124,17 +117,24 @@ export const idlFactory = ({ IDL }) => {
     'jumlahSasaran' : IDL.Nat,
     'sasaran' : IDL.Text,
   });
+  const UserRole = IDL.Variant({
+    'admin' : IDL.Null,
+    'user' : IDL.Null,
+    'guest' : IDL.Null,
+  });
   const UserProfile = IDL.Record({
     'nip' : IDL.Text,
     'nama' : IDL.Text,
     'wilayahKerja' : IDL.Text,
     'nomorHp' : IDL.Text,
     'jabatan' : IDL.Text,
+    'tandaTangan' : IDL.Opt(IDL.Text),
     'unitKerja' : IDL.Text,
   });
   
   return IDL.Service({
     '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
+    'addReport' : IDL.Func([RKHReport], [], []),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
     'createRKHReport' : IDL.Func(
         [
@@ -151,56 +151,56 @@ export const idlFactory = ({ IDL }) => {
         [RKHReport],
         [],
       ),
-    'deleteReport' : IDL.Func([IDL.Nat], [], []),
-    'filterReports' : IDL.Func(
-        [IDL.Principal, IDL.Opt(IDL.Text), IDL.Opt(IDL.Text)],
+    'filterReportsByUser' : IDL.Func(
+        [IDL.Principal],
         [IDL.Vec(RKHReport)],
         ['query'],
       ),
-    'getAllReports' : IDL.Func([], [IDL.Vec(RKHReport)], ['query']),
+    'filterReportsByUserAndMonth' : IDL.Func(
+        [IDL.Principal, IDL.Text],
+        [IDL.Vec(RKHReport)],
+        ['query'],
+      ),
+    'filterReportsByUserAndMonthYear' : IDL.Func(
+        [IDL.Principal, IDL.Text, IDL.Text],
+        [IDL.Vec(RKHReport)],
+        ['query'],
+      ),
+    'filterReportsByUserAndYear' : IDL.Func(
+        [IDL.Principal, IDL.Text],
+        [IDL.Vec(RKHReport)],
+        ['query'],
+      ),
     'getAllUserProfiles' : IDL.Func([], [IDL.Vec(UserProfile)], ['query']),
     'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
     'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
-    'getMyProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
-    'getMyReports' : IDL.Func([], [IDL.Vec(RKHReport)], ['query']),
     'getReportById' : IDL.Func([IDL.Nat], [RKHReport], ['query']),
+    'getReports' : IDL.Func([], [IDL.Vec(RKHReport)], ['query']),
     'getUserProfile' : IDL.Func(
         [IDL.Principal],
         [IDL.Opt(UserProfile)],
         ['query'],
       ),
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
-    'queryRKHReports' : IDL.Func(
+    'isValidNumaiIndicator' : IDL.Func([IDL.Vec(IDL.Int)], [IDL.Bool], []),
+    'queryReports' : IDL.Func(
         [
-          IDL.Record({
-            'tahun' : IDL.Opt(IDL.Text),
-            'tanggal' : IDL.Opt(IDL.Text),
-            'user' : IDL.Opt(IDL.Principal),
-            'bulan' : IDL.Opt(IDL.Text),
-          }),
+          IDL.Opt(IDL.Text),
+          IDL.Opt(IDL.Text),
+          IDL.Opt(IDL.Text),
+          IDL.Opt(IDL.Principal),
         ],
+        [IDL.Vec(RKHReport)],
+        ['query'],
+      ),
+    'queryReportsYearly' : IDL.Func(
+        [IDL.Text],
         [IDL.Vec(RKHReport)],
         ['query'],
       ),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
     'setUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
-    'updateMyProfile' : IDL.Func([UserProfile], [], []),
-    'updateReport' : IDL.Func(
-        [
-          IDL.Nat,
-          IDL.Record({
-            'hasilKegiatan' : IDL.Text,
-            'kegiatan' : IDL.Text,
-            'tanggal' : IDL.Text,
-            'lokasi' : IDL.Text,
-            'keterangan' : IDL.Opt(IDL.Text),
-            'jumlahSasaran' : IDL.Nat,
-            'sasaran' : IDL.Text,
-          }),
-        ],
-        [RKHReport],
-        [],
-      ),
+    'updateReport' : IDL.Func([IDL.Vec(RKHReport)], [], []),
   });
 };
 
