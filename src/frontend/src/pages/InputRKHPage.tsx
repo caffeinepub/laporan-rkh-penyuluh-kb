@@ -21,7 +21,8 @@ import { useCreateRKHReport, useUpdateReport } from "../hooks/useQueries";
 import type { Page } from "../types";
 import { StorageClient } from "../utils/StorageClient";
 
-const MIN_ATTACHMENTS = 5;
+const MIN_ATTACHMENTS = 2;
+const MAX_ATTACHMENTS = 5;
 
 interface InputRKHPageProps {
   onNavigate: (page: Page) => void;
@@ -94,7 +95,9 @@ export default function InputRKHPage({
     if (!form.lokasi.trim()) e.lokasi = "Lokasi wajib diisi";
     if (!form.hasilKegiatan.trim())
       e.hasilKegiatan = "Hasil kegiatan wajib diisi";
-    if (attachedFiles.length > 0 && attachedFiles.length < MIN_ATTACHMENTS)
+    if (attachedFiles.length > MAX_ATTACHMENTS)
+      e.lampiran = `Lampiran maksimal ${MAX_ATTACHMENTS} file.`;
+    else if (attachedFiles.length > 0 && attachedFiles.length < MIN_ATTACHMENTS)
       e.lampiran = `Lampiran minimal ${MIN_ATTACHMENTS} file. Saat ini baru ${attachedFiles.length} file.`;
     return e;
   };
@@ -103,7 +106,7 @@ export default function InputRKHPage({
     const files = Array.from(e.target.files ?? []);
     if (files.length > 0) {
       setAttachedFiles((prev) => {
-        const combined = [...prev, ...files];
+        const combined = [...prev, ...files].slice(0, MAX_ATTACHMENTS);
         return combined;
       });
     }

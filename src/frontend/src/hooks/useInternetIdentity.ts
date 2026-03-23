@@ -88,9 +88,13 @@ export function InternetIdentityProvider({
   children: ReactNode;
   createOptions?: AuthClientCreateOptions;
 }>) {
+  // Store authClient in a ref -- never triggers re-renders
   const authClientRef = useRef<AuthClient | undefined>(undefined);
-  const initializedRef = useRef(false);
+  // Guard: ensure init runs exactly once
+  const initStartedRef = useRef(false);
+  // Stable ref for createOptions so it never causes effect reruns
   const createOptionsRef = useRef(createOptions);
+
   const [identity, setIdentity] = useState<Identity | undefined>(undefined);
   const [loginStatus, setStatus] = useState<Status>("initializing");
   const [loginError, setError] = useState<Error | undefined>(undefined);
@@ -120,7 +124,9 @@ export function InternetIdentityProvider({
   const login = useCallback(() => {
     const authClient = authClientRef.current;
     if (!authClient) {
-      setErrorMessage("AuthClient is not initialized yet.");
+      setErrorMessage(
+        "AuthClient is not initialized yet, make sure to call `login` on user interaction e.g. click.",
+      );
       return;
     }
 
@@ -156,7 +162,7 @@ export function InternetIdentityProvider({
       .logout()
       .then(() => {
         authClientRef.current = undefined;
-        initializedRef.current = false;
+        initStartedRef.current = false;
         setIdentity(undefined);
         setStatus("idle");
         setError(undefined);
@@ -171,10 +177,10 @@ export function InternetIdentityProvider({
       });
   }, [setErrorMessage]);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally run once on mount only
+  // Empty dependency array -- runs ONCE on mount only, no reruns
   useEffect(() => {
-    if (initializedRef.current) return;
-    initializedRef.current = true;
+    if (initStartedRef.current) return;
+    initStartedRef.current = true;
 
     void (async () => {
       try {
@@ -186,6 +192,7 @@ export function InternetIdentityProvider({
           const loadedIdentity = client.getIdentity();
           setIdentity(loadedIdentity);
         }
+        setStatus("idle");
       } catch (unknownError) {
         setStatus("loginError");
         setError(
@@ -193,11 +200,9 @@ export function InternetIdentityProvider({
             ? unknownError
             : new Error("Initialization failed"),
         );
-      } finally {
-        setStatus("idle");
       }
     })();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const value = useMemo<ProviderValue>(
     () => ({

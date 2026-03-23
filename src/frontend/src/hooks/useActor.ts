@@ -5,29 +5,22 @@ import { getSecretParameter } from "../utils/urlParams";
 import { useInternetIdentity } from "./useInternetIdentity";
 
 export function useActor() {
-  const { identity, isInitializing } = useInternetIdentity();
+  const { identity } = useInternetIdentity();
   const actorQuery = useQuery<backendInterface>({
     queryKey: ["actor", identity?.getPrincipal().toString()],
     queryFn: async () => {
-      const isAuthenticated = !!identity;
-
-      if (!isAuthenticated) {
+      if (!identity) {
         return await createActorWithConfig();
       }
-
-      const actorOptions = {
-        agentOptions: {
-          identity,
-        },
-      };
-
-      const actor = await createActorWithConfig(actorOptions);
+      const actor = await createActorWithConfig({
+        agentOptions: { identity },
+      });
       const adminToken = getSecretParameter("caffeineAdminToken") || "";
       await actor._initializeAccessControlWithSecret(adminToken);
       return actor;
     },
     staleTime: Number.POSITIVE_INFINITY,
-    enabled: !isInitializing,
+    enabled: true,
   });
 
   return {
