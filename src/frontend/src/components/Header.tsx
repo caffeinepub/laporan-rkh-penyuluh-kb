@@ -9,6 +9,7 @@ import {
   Shield,
   User,
 } from "lucide-react";
+import { useState } from "react";
 import type { UserProfile } from "../backend.d";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import type { Page } from "../types";
@@ -34,6 +35,9 @@ const navItems: { page: Page; label: string; icon: React.ReactNode }[] = [
   { page: "profil", label: "Profil", icon: <User size={15} /> },
 ];
 
+const LOGO_PATH =
+  "/assets/uploads/Logo_Kementerian_Kependudukan_dan_Pembangunan_Keluarga_-_BKKBN_-2024-.svg-1.png";
+
 export default function Header({
   currentPage,
   onNavigate,
@@ -45,10 +49,11 @@ export default function Header({
 }: HeaderProps) {
   const { clear } = useInternetIdentity();
   const qc = useQueryClient();
+  const [logoError, setLogoError] = useState(false);
 
   const handleLogout = async () => {
-    await clear();
     qc.clear();
+    await clear();
   };
 
   const allNavItems = isAdmin
@@ -67,11 +72,23 @@ export default function Header({
       {/* Tier 1: Branding strip */}
       <div className="bg-white flex items-center justify-between px-4 py-2 border-b border-brand-border">
         <div className="flex items-center gap-3">
-          <img
-            src="/assets/uploads/Logo_Kementerian_Kependudukan_dan_Pembangunan_Keluarga_-_BKKBN_-2024-.svg-1.png"
-            alt="Logo BKKBN"
-            className="h-12 w-auto object-contain"
-          />
+          {!logoError ? (
+            <img
+              src={LOGO_PATH}
+              alt="Logo BKKBN"
+              className="h-12 w-auto object-contain"
+              onError={() => setLogoError(true)}
+            />
+          ) : (
+            <div
+              className="h-12 w-12 rounded-full flex items-center justify-center text-white font-bold text-sm"
+              style={{
+                background: "linear-gradient(135deg, #1F8A63 0%, #2AA08A 100%)",
+              }}
+            >
+              BKKBN
+            </div>
+          )}
         </div>
         <div
           className="hidden sm:flex flex-1 mx-4 rounded-lg px-4 py-2 items-center justify-center"

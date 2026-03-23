@@ -51,26 +51,13 @@ export default function InputRKHPage({
   const createMutation = useCreateRKHReport();
   const updateMutation = useUpdateReport();
   const { identity } = useInternetIdentity();
+  // Store identity in ref so it's always up-to-date during async upload
+  const identityRef = useRef(identity);
+  identityRef.current = identity;
 
-  const [form, setForm] = useState({
-    tanggal: "",
-    kegiatan: "",
-    sasaran: "",
-    jumlahSasaran: "",
-    lokasi: "",
-    hasilKegiatan: "",
-    keterangan: "",
-  });
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<number[]>([]);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Initialize form when editing
-  useState(() => {
+  const [form, setForm] = useState(() => {
     if (editReport) {
-      setForm({
+      return {
         tanggal: editReport.tanggal,
         kegiatan: editReport.kegiatan,
         sasaran: editReport.sasaran,
@@ -78,12 +65,24 @@ export default function InputRKHPage({
         lokasi: editReport.lokasi,
         hasilKegiatan: editReport.hasilKegiatan,
         keterangan: editReport.keterangan ?? "",
-      });
-    } else {
-      const today = new Date().toISOString().split("T")[0];
-      setForm((f) => ({ ...f, tanggal: today ?? "" }));
+      };
     }
+    const today = new Date().toISOString().split("T")[0];
+    return {
+      tanggal: today ?? "",
+      kegiatan: "",
+      sasaran: "",
+      jumlahSasaran: "",
+      lokasi: "",
+      hasilKegiatan: "",
+      keterangan: "",
+    };
   });
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const validate = () => {
     const e: Record<string, string> = {};
@@ -106,8 +105,7 @@ export default function InputRKHPage({
     const files = Array.from(e.target.files ?? []);
     if (files.length > 0) {
       setAttachedFiles((prev) => {
-        const combined = [...prev, ...files].slice(0, MAX_ATTACHMENTS);
-        return combined;
+        return [...prev, ...files].slice(0, MAX_ATTACHMENTS);
       });
     }
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -124,9 +122,14 @@ export default function InputRKHPage({
     setUploadProgress(new Array(attachedFiles.length).fill(0));
     try {
       const config = await loadConfig();
+      // Use identityRef.current to always get latest identity
+      const currentIdentity = identityRef.current;
+      if (!currentIdentity) {
+        throw new Error("Sesi login tidak ditemukan. Silakan login ulang.");
+      }
       const agent = new HttpAgent({
         host: config.backend_host,
-        identity: identity ?? undefined,
+        identity: currentIdentity,
       });
       const storageClient = new StorageClient(
         config.bucket_name,
@@ -167,8 +170,10 @@ export default function InputRKHPage({
     let lampiranValue: string | undefined;
     try {
       lampiranValue = await uploadAttachments();
-    } catch {
-      toast.error("Gagal mengunggah lampiran. Silakan coba lagi.");
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : "Gagal mengunggah lampiran.";
+      toast.error(`${msg} Silakan coba lagi.`);
       return;
     }
 
@@ -406,7 +411,7 @@ export default function InputRKHPage({
           />
         </div>
 
-        {/* Lampiran / Attachment - minimal 5 file */}
+        {/* Lampiran / Attachment */}
         <div>
           <div className="flex items-center justify-between mb-1">
             <Label className="text-sm font-medium text-brand-nav">
@@ -481,7 +486,7 @@ export default function InputRKHPage({
           {attachedFiles.length > 0 &&
             attachedFiles.length < MIN_ATTACHMENTS && (
               <div className="flex items-center gap-2 mb-3">
-                {[1, 2, 3, 4, 5].map((step) => (
+                {[1, 2].map((step) => (
                   <div
                     key={step}
                     className={`h-1.5 flex-1 rounded-full transition-all ${
@@ -538,7 +543,7 @@ export default function InputRKHPage({
 
           {attachedFiles.length >= MIN_ATTACHMENTS && (
             <p className="text-xs text-green-600 mt-1.5 flex items-center gap-1">
-              <span>✓</span> {attachedFiles.length} file siap diunggah
+              <span>&#10003;</span> {attachedFiles.length} file siap diunggah
             </p>
           )}
         </div>
