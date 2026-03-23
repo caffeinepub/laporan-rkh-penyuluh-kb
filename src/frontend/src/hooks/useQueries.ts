@@ -4,6 +4,7 @@ import type {
   backendInterface as BackendDInterface,
   RKHReport,
   UserProfile,
+  UserProfileWithPrincipal,
   UserRole,
 } from "../backend.d";
 import { useActor } from "./useActor";
@@ -203,6 +204,20 @@ export function useGetAllUserProfiles() {
     queryFn: async () => {
       if (!actor) return [];
       return actor.getAllUserProfiles();
+    },
+    enabled: !!actor && !actorFetching,
+  });
+}
+
+export function useGetAllUserProfilesWithPrincipals() {
+  const { actor, isFetching: actorFetching } = useActor();
+  return useQuery<UserProfileWithPrincipal[]>({
+    queryKey: ["allUserProfilesWithPrincipals"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return (
+        actor as unknown as BackendDInterface
+      ).getAllUserProfilesWithPrincipals();
     },
     enabled: !!actor && !actorFetching,
   });

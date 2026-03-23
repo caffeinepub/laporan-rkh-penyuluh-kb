@@ -1,28 +1,22 @@
 # Laporan RKH Penyuluh KB
 
 ## Current State
-- UserProfile has: nama, nip, wilayahKerja, unitKerja, jabatan, nomorHp
-- ProfilPage: form edit profil tanpa tanda tangan
-- RiwayatLaporanPage: print section menampilkan nama dan NIP di bagian tanda tangan, tanpa gambar tanda tangan
+Admin panel has a Token Akses tab. The handleSave function tries to find the user's Principal by checking if `entry.user.toString().includes(profile.nip)` -- this always fails because a Principal string never contains the NIP.
 
 ## Requested Changes (Diff)
 
 ### Add
-- Field `tandaTangan` (Optional Text / base64 data URL) di UserProfile backend
-- Fitur upload gambar tanda tangan di ProfilPage
-- Preview gambar tanda tangan setelah upload
-- Tampilan tanda tangan di atas nama pada bagian cetak laporan
+- Backend function `getAllUserProfilesWithPrincipals()` returning `[{user: Principal, profile: UserProfile}]`
+- Frontend hook `useGetAllUserProfilesWithPrincipals()`
 
 ### Modify
-- `UserProfile` type di backend: tambah field `tandaTangan: ?Text`
-- `saveCallerUserProfile` dan `updateMyProfile` menerima field baru
-- ProfilPage: tambah section upload tanda tangan
-- RiwayatLaporanPage print section: tampilkan `<img>` tanda tangan di atas nama jika tersedia
+- TokenAksesTab: use principal-mapped data to correctly find Principal by NIP when saving token
 
 ### Remove
-- Tidak ada
+- Broken logic replaced with correct principal lookup
 
 ## Implementation Plan
-1. Update backend UserProfile type dengan field tandaTangan
-2. Update ProfilPage dengan upload tanda tangan (input file -> base64)
-3. Update RiwayatLaporanPage print section: tampilkan tanda tangan di atas nama
+1. Add `getAllUserProfilesWithPrincipals` to backend
+2. Update backend.d.ts
+3. Add hook in useQueries.ts
+4. Fix TokenAksesTab in AdminPage.tsx

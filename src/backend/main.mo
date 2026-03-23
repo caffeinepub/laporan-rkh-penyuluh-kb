@@ -11,12 +11,9 @@ import Array "mo:core/Array";
 import AccessControl "authorization/access-control";
 import MixinAuthorization "authorization/MixinAuthorization";
 
-// Use migration to upgrade from original actor.
-
 actor {
   type UserRole = AccessControl.UserRole;
 
-  // Extended with optional tandaTangan field.
   type UserProfile = {
     nama : Text;
     nip : Text;
@@ -24,7 +21,7 @@ actor {
     unitKerja : Text;
     jabatan : Text;
     nomorHp : Text;
-    tandaTangan : ?Text; // base64 data URL of signature image
+    tandaTangan : ?Text;
   };
 
   type RKHReport = {
@@ -40,24 +37,24 @@ actor {
     createdAt : Int;
   };
 
-  // Token entry type for getAllUserTokens response
   type UserTokenEntry = {
     user : Principal;
     token : Text;
   };
 
-  // Original actor state.
+  type UserProfileWithPrincipal = {
+    user : Principal;
+    profile : UserProfile;
+  };
+
   var nextReportId = 1;
   let rkhReports = Map.empty<Nat, RKHReport>();
   let userProfiles = Map.empty<Principal, UserProfile>();
-  // Token storage: Principal -> unique token string
   let userTokens = Map.empty<Principal, Text>();
 
-  // Prefabricated authorization component
   let accessControlState = AccessControl.initState();
   include MixinAuthorization(accessControlState);
 
-  // Get caller's user profile.
   public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only registered users can view profiles");
@@ -65,7 +62,6 @@ actor {
     userProfiles.get(caller);
   };
 
-  // Save/update caller's user profile.
   public shared ({ caller }) func saveCallerUserProfile(profile : UserProfile) : async () {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only registered users can save profiles");
@@ -73,7 +69,6 @@ actor {
     userProfiles.add(caller, profile);
   };
 
-  // Get another user's profile (by admin or self only).
   public query ({ caller }) func getUserProfile(user : Principal) : async ?UserProfile {
     if (caller != user and not AccessControl.isAdmin(accessControlState, caller)) {
       Runtime.trap("Unauthorized: Can only view your own profile");
@@ -81,12 +76,10 @@ actor {
     userProfiles.get(user);
   };
 
-  // Set user's role (admin only).
   public shared ({ caller }) func setUserRole(user : Principal, newRole : UserRole) : async () {
     AccessControl.assignRole(accessControlState, caller, user, newRole);
   };
 
-  // Get all user profiles (admin only).
   public query ({ caller }) func getAllUserProfiles() : async [UserProfile] {
     if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
       Runtime.trap("Unauthorized: Only admin can view all user profiles");
@@ -94,9 +87,14 @@ actor {
     userProfiles.values().toArray();
   };
 
-  // --- Token Management ---
+  // Get all user profiles with their principals (admin only).
+  public query ({ caller }) func getAllUserProfilesWithPrincipals() : async [UserProfileWithPrincipal] {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
+      Runtime.trap("Unauthorized: Only admin can view all user profiles");
+    };
+    userProfiles.entries().map(func(e) : UserProfileWithPrincipal { { user = e.0; profile = e.1 } }).toArray();
+  };
 
-  // Admin sets a unique token for a user.
   public shared ({ caller }) func setUserToken(user : Principal, token : Text) : async () {
     if (not AccessControl.isAdmin(accessControlState, caller)) {
       Runtime.trap("Unauthorized: Only admin can set user tokens");
@@ -104,7 +102,6 @@ actor {
     userTokens.add(user, token);
   };
 
-  // Admin gets a specific user's token.
   public query ({ caller }) func getUserToken(user : Principal) : async ?Text {
     if (not AccessControl.isAdmin(accessControlState, caller)) {
       Runtime.trap("Unauthorized: Only admin can view user tokens");
@@ -112,7 +109,6 @@ actor {
     userTokens.get(user);
   };
 
-  // Admin gets all user tokens.
   public query ({ caller }) func getAllUserTokens() : async [UserTokenEntry] {
     if (not AccessControl.isAdmin(accessControlState, caller)) {
       Runtime.trap("Unauthorized: Only admin can view all user tokens");
@@ -120,7 +116,6 @@ actor {
     userTokens.entries().map(func(e) : UserTokenEntry { { user = e.0; token = e.1 } }).toArray();
   };
 
-  // User validates their own token. Returns true if token matches.
   public query ({ caller }) func validateUserToken(token : Text) : async Bool {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only registered users can validate tokens");
@@ -131,7 +126,6 @@ actor {
     };
   };
 
-  // Create new RKH report (must have user profile).
   public shared ({ caller }) func createRKHReport(input : {
     tanggal : Text;
     kegiatan : Text;
@@ -163,7 +157,6 @@ actor {
     report;
   };
 
-  // Get reports (admin sees all, regular users see own reports).
   public query ({ caller }) func getReports() : async [RKHReport] {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only registered users can view reports");
@@ -179,7 +172,6 @@ actor {
     );
   };
 
-  // Filter reports by user id (admin or self only).
   public query ({ caller }) func filterReportsByUser(user : Principal) : async [RKHReport] {
     if (user != caller and not AccessControl.isAdmin(accessControlState, caller)) {
       Runtime.trap("Unauthorized: Can only view your own reports");
@@ -187,7 +179,6 @@ actor {
     rkhReports.values().filter(func(report) { report.user == user }).toArray();
   };
 
-  // Filter reports by user id and month (admin or self only).
   public query ({ caller }) func filterReportsByUserAndMonth(user : Principal, month : Text) : async [RKHReport] {
     if (user != caller and not AccessControl.isAdmin(accessControlState, caller)) {
       Runtime.trap("Unauthorized: Can only view your own reports");
@@ -199,7 +190,6 @@ actor {
     ).toArray();
   };
 
-  // Filter reports by user id, month, year (admin or self only).
   public query ({ caller }) func filterReportsByUserAndMonthYear(user : Principal, month : Text, year : Text) : async [RKHReport] {
     if (user != caller and not AccessControl.isAdmin(accessControlState, caller)) {
       Runtime.trap("Unauthorized: Can only view your own reports");
@@ -211,7 +201,6 @@ actor {
     ).toArray();
   };
 
-  // Filter by user id and year (admin or self only).
   public query ({ caller }) func filterReportsByUserAndYear(user : Principal, year : Text) : async [RKHReport] {
     if (user != caller and not AccessControl.isAdmin(accessControlState, caller)) {
       Runtime.trap("Unauthorized: Can only view your own reports");
@@ -223,7 +212,6 @@ actor {
     ).toArray();
   };
 
-  // General report query filter.
   public query ({ caller }) func queryReports(tanggal : ?Text, bulan : ?Text, tahun : ?Text, user : ?Principal) : async [RKHReport] {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only registered users can view reports");
@@ -234,7 +222,6 @@ actor {
 
     rkhReports.values().forEach(
       func(r) {
-        // Non-admin users can only see their own reports.
         if (not isAdmin and r.user != caller) {
           return;
         };
@@ -248,7 +235,6 @@ actor {
           };
           case (_, _, ?tahun, _) { r.tanggal.startsWith(#text tahun) };
           case (_, _, _, ?filterUser) {
-            // Non-admin users can only filter by reviewer (themselves)
             if (not isAdmin and filterUser != caller) {
               false;
             } else {
@@ -260,13 +246,11 @@ actor {
       }
     );
 
-    // Sort reports by tanggal
     reports.toArray().sort(
       func(a, b) { Text.compare(a.tanggal, b.tanggal) }
     );
   };
 
-  // Query for specific year.
   public query ({ caller }) func queryReportsYearly(filterYear : Text) : async [RKHReport] {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only registered users can view reports");
@@ -283,7 +267,6 @@ actor {
     );
   };
 
-  // Get specific report by id (admin or owner only)
   public query ({ caller }) func getReportById(reportId : Nat) : async RKHReport {
     switch (rkhReports.get(reportId)) {
       case (null) {
@@ -310,7 +293,6 @@ actor {
     createdAt : Int;
   };
 
-  // Save new report version (must be report owner)
   public shared ({ caller }) func updateReport(reports : [RKHReport]) : async () {
     for (report in reports.values()) {
       switch (rkhReports.get(report.id)) {
@@ -331,7 +313,6 @@ actor {
     };
   };
 
-  // Add report (must own report).
   public shared ({ caller }) func addReport(report : RKHReport) : async () {
     switch (rkhReports.get(report.id)) {
       case (null) {
@@ -346,7 +327,6 @@ actor {
     rkhReports.add(report.id, report);
   };
 
-  // Validate numaiIndicator input is not empty.
   public func isValidNumaiIndicator(numaiIndicator : [Int]) : async Bool {
     not numaiIndicator.isEmpty();
   };

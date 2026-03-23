@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import {
   useGetAllReports,
   useGetAllUserProfiles,
+  useGetAllUserProfilesWithPrincipals,
   useGetAllUserTokens,
   useSetUserToken,
 } from "../hooks/useQueries";
@@ -399,17 +400,11 @@ function TokenAksesTab({
     isLoading: tokensLoading,
     refetch,
   } = useGetAllUserTokens();
+  const { data: profilesWithPrincipals = [] } =
+    useGetAllUserProfilesWithPrincipals();
   const setTokenMutation = useSetUserToken();
   const [editingNip, setEditingNip] = useState<string | null>(null);
   const [tokenInputs, setTokenInputs] = useState<Record<string, string>>({});
-
-  // Build a map nip -> principal from profiles (profiles have nip, not principal directly)
-  // We need principal to call setUserToken. But getUserProfile uses Principal.
-  // For now, we use the token entries to match user.
-  const tokenMap: Record<string, string> = {};
-  for (const entry of tokenEntries) {
-    tokenMap[entry.user.toString()] = entry.token;
-  }
 
   const handleSave = async (profile: import("../backend.d").UserProfile) => {
     const newToken = tokenInputs[profile.nip] ?? "";
@@ -417,15 +412,13 @@ function TokenAksesTab({
       toast.error("Token tidak boleh kosong");
       return;
     }
-    // We need to find the principal for this user from token entries or just set by nip
-    // Since backend setUserToken takes Principal, we need to match via tokenEntries
-    // For profiles, we match by checking if any tokenEntry user toString contains nip
-    const entry = tokenEntries.find((e) =>
-      e.user.toString().includes(profile.nip),
+    // Find principal by NIP using profilesWithPrincipals
+    const entry = profilesWithPrincipals.find(
+      (e) => e.profile.nip === profile.nip,
     );
     if (!entry) {
       toast.error(
-        "Tidak dapat menemukan principal pengguna ini. Pastikan pengguna sudah login minimal sekali.",
+        "Tidak dapat menemukan data pengguna. Pastikan pengguna sudah login minimal sekali.",
       );
       return;
     }
@@ -494,9 +487,15 @@ function TokenAksesTab({
             <tbody className="divide-y divide-brand-border">
               {profiles.map((p, idx) => {
                 const isEditing = editingNip === p.nip;
-                const currentToken = tokenEntries.find((e) =>
-                  e.user.toString().includes(p.nip),
-                )?.token;
+                const principalEntry = profilesWithPrincipals.find(
+                  (e) => e.profile.nip === p.nip,
+                );
+                const currentToken = principalEntry
+                  ? tokenEntries.find(
+                      (e) =>
+                        e.user.toString() === principalEntry.user.toString(),
+                    )?.token
+                  : undefined;
                 return (
                   <tr
                     key={p.nip}
@@ -512,7 +511,7 @@ function TokenAksesTab({
                       {isEditing ? (
                         <div className="flex items-center gap-2">
                           <Input
-                            data-ocid={"admin.tokens.input"}
+                            data-ocid="admin.tokens.input"
                             className="h-8 text-xs font-mono w-40"
                             value={tokenInputs[p.nip] ?? ""}
                             onChange={(e) =>
@@ -535,7 +534,7 @@ function TokenAksesTab({
                                 [p.nip]: gen,
                               }));
                             }}
-                            data-ocid={"admin.tokens.secondary_button"}
+                            data-ocid="admin.tokens.secondary_button"
                             title="Generate token acak"
                           >
                             <RefreshCw size={11} />
@@ -562,7 +561,7 @@ function TokenAksesTab({
                             className="h-8 text-xs"
                             onClick={() => handleSave(p)}
                             disabled={setTokenMutation.isPending}
-                            data-ocid={"admin.tokens.save_button"}
+                            data-ocid="admin.tokens.save_button"
                             style={{ background: "#1F8A63", color: "#fff" }}
                           >
                             {setTokenMutation.isPending ? (
@@ -577,7 +576,7 @@ function TokenAksesTab({
                             size="sm"
                             className="h-8 text-xs"
                             onClick={() => setEditingNip(null)}
-                            data-ocid={"admin.tokens.cancel_button"}
+                            data-ocid="admin.tokens.cancel_button"
                           >
                             Batal
                           </Button>
@@ -595,7 +594,7 @@ function TokenAksesTab({
                               [p.nip]: currentToken ?? "",
                             }));
                           }}
-                          data-ocid={"admin.tokens.edit_button"}
+                          data-ocid="admin.tokens.edit_button"
                         >
                           <KeyRound size={12} className="mr-1" />
                           Set Token

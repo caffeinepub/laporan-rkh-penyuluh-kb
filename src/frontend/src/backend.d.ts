@@ -32,6 +32,10 @@ export interface UserTokenEntry {
     user: Principal;
     token: string;
 }
+export interface UserProfileWithPrincipal {
+    user: Principal;
+    profile: UserProfile;
+}
 export enum UserRole {
     admin = "admin",
     user = "user",
@@ -54,6 +58,7 @@ export interface backendInterface {
     filterReportsByUserAndMonthYear(user: Principal, month: string, year: string): Promise<Array<RKHReport>>;
     filterReportsByUserAndYear(user: Principal, year: string): Promise<Array<RKHReport>>;
     getAllUserProfiles(): Promise<Array<UserProfile>>;
+    getAllUserProfilesWithPrincipals(): Promise<Array<UserProfileWithPrincipal>>;
     getAllUserTokens(): Promise<Array<UserTokenEntry>>;
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
