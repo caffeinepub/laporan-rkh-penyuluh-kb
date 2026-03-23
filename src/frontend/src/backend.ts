@@ -110,6 +110,14 @@ export interface UserProfile {
     tandaTangan?: string;
     unitKerja: string;
 }
+export interface UserTokenEntry {
+    user: Principal;
+    token: string;
+}
+export interface UserProfileWithPrincipal {
+    user: Principal;
+    profile: UserProfile;
+}
 export enum UserRole {
     admin = "admin",
     user = "user",
@@ -133,6 +141,11 @@ export interface backendInterface {
     filterReportsByUserAndMonthYear(user: Principal, month: string, year: string): Promise<Array<RKHReport>>;
     filterReportsByUserAndYear(user: Principal, year: string): Promise<Array<RKHReport>>;
     getAllUserProfiles(): Promise<Array<UserProfile>>;
+    getAllUserProfilesWithPrincipals(): Promise<Array<UserProfileWithPrincipal>>;
+    getAllUserTokens(): Promise<Array<UserTokenEntry>>;
+    getUserToken(user: Principal): Promise<string | null>;
+    setUserToken(user: Principal, token: string): Promise<void>;
+    validateUserToken(token: string): Promise<boolean>;
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
     getReportById(reportId: bigint): Promise<RKHReport>;
@@ -282,6 +295,27 @@ export class Backend implements backendInterface {
             const result = await this.actor.getAllUserProfiles();
             return from_candid_vec_n10(this._uploadFile, this._downloadFile, result);
         }
+    }
+    async getAllUserProfilesWithPrincipals(): Promise<Array<UserProfileWithPrincipal>> {
+        const result = await this.actor.getAllUserProfilesWithPrincipals();
+        return result.map((e: { user: Principal; profile: any }) => ({
+            user: e.user,
+            profile: from_candid_record_n12(this._uploadFile, this._downloadFile, e.profile),
+        }));
+    }
+    async getAllUserTokens(): Promise<Array<UserTokenEntry>> {
+        const result = await this.actor.getAllUserTokens();
+        return result.map((e: { user: Principal; token: string }) => ({ user: e.user, token: e.token }));
+    }
+    async getUserToken(arg0: Principal): Promise<string | null> {
+        const result = await this.actor.getUserToken(arg0);
+        return result.length === 0 ? null : result[0];
+    }
+    async setUserToken(arg0: Principal, arg1: string): Promise<void> {
+        return this.actor.setUserToken(arg0, arg1);
+    }
+    async validateUserToken(arg0: string): Promise<boolean> {
+        return this.actor.validateUserToken(arg0);
     }
     async getCallerUserProfile(): Promise<UserProfile | null> {
         if (this.processError) {

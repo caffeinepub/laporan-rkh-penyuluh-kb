@@ -1,5 +1,5 @@
 import { Toaster } from "@/components/ui/sonner";
-import { useState } from "react";
+import { Suspense, lazy, useState } from "react";
 import type { RKHReport } from "./backend.d";
 import { useInternetIdentity } from "./hooks/useInternetIdentity";
 import { useGetCallerUserProfile, useIsCallerAdmin } from "./hooks/useQueries";
@@ -8,13 +8,26 @@ import type { Page } from "./types";
 import Footer from "./components/Footer";
 import Header from "./components/Header";
 import Sidebar from "./components/Sidebar";
-import AdminPage from "./pages/AdminPage";
-import DashboardPage from "./pages/DashboardPage";
-import InputRKHPage from "./pages/InputRKHPage";
 import LoginPage from "./pages/LoginPage";
-import ProfilPage from "./pages/ProfilPage";
 import ProfileSetupPage from "./pages/ProfileSetupPage";
-import RiwayatLaporanPage from "./pages/RiwayatLaporanPage";
+
+// Lazy-load heavy pages to reduce initial bundle size
+const DashboardPage = lazy(() => import("./pages/DashboardPage"));
+const InputRKHPage = lazy(() => import("./pages/InputRKHPage"));
+const RiwayatLaporanPage = lazy(() => import("./pages/RiwayatLaporanPage"));
+const ProfilPage = lazy(() => import("./pages/ProfilPage"));
+const AdminPage = lazy(() => import("./pages/AdminPage"));
+
+function PageLoader() {
+  return (
+    <div className="flex items-center justify-center py-16">
+      <div className="text-center">
+        <div className="w-8 h-8 border-2 border-brand-green border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+        <p className="text-brand-muted text-xs">Memuat...</p>
+      </div>
+    </div>
+  );
+}
 
 export default function App() {
   const { identity, isInitializing } = useInternetIdentity();
@@ -140,7 +153,9 @@ export default function App() {
               tokenVerified={effectiveTokenVerified}
             />
           </div>
-          <div className="flex-1 min-w-0">{renderPage()}</div>
+          <div className="flex-1 min-w-0">
+            <Suspense fallback={<PageLoader />}>{renderPage()}</Suspense>
+          </div>
         </div>
       </main>
 

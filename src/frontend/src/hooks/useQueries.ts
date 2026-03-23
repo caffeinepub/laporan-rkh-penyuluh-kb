@@ -1,7 +1,6 @@
 import type { Principal } from "@icp-sdk/core/principal";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
-  backendInterface as BackendDInterface,
   RKHReport,
   UserProfile,
   UserProfileWithPrincipal,
@@ -124,6 +123,7 @@ export function useCreateRKHReport() {
       tanggal: string;
       lokasi: string;
       keterangan?: string;
+      lampiran?: string;
       jumlahSasaran: bigint;
       sasaran: string;
     }) => {
@@ -153,6 +153,7 @@ export function useUpdateReport() {
         tanggal: string;
         lokasi: string;
         keterangan?: string;
+        lampiran?: string;
         jumlahSasaran: bigint;
         sasaran: string;
       };
@@ -215,9 +216,7 @@ export function useGetAllUserProfilesWithPrincipals() {
     queryKey: ["allUserProfilesWithPrincipals"],
     queryFn: async () => {
       if (!actor) return [];
-      return (
-        actor as unknown as BackendDInterface
-      ).getAllUserProfilesWithPrincipals();
+      return actor.getAllUserProfilesWithPrincipals();
     },
     enabled: !!actor && !actorFetching,
   });
@@ -241,7 +240,7 @@ export function useValidateUserToken() {
   return useMutation({
     mutationFn: async (token: string) => {
       if (!actor) throw new Error("Actor not available");
-      return (actor as unknown as BackendDInterface).validateUserToken(token);
+      return actor.validateUserToken(token);
     },
   });
 }
@@ -252,7 +251,7 @@ export function useSetUserToken() {
   return useMutation({
     mutationFn: async ({ user, token }: { user: Principal; token: string }) => {
       if (!actor) throw new Error("Actor not available");
-      await (actor as unknown as BackendDInterface).setUserToken(user, token);
+      await actor.setUserToken(user, token);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["allUserTokens"] }),
   });
@@ -264,7 +263,7 @@ export function useGetAllUserTokens() {
     queryKey: ["allUserTokens"],
     queryFn: async () => {
       if (!actor) return [];
-      return (actor as unknown as BackendDInterface).getAllUserTokens();
+      return actor.getAllUserTokens();
     },
     enabled: !!actor && !actorFetching,
   });

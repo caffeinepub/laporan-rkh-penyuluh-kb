@@ -16,6 +16,7 @@ export interface RKHReport {
     user: Principal;
     lokasi: string;
     keterangan?: string;
+    lampiran?: string;
     jumlahSasaran: bigint;
     sasaran: string;
 }
@@ -50,6 +51,7 @@ export interface backendInterface {
         tanggal: string;
         lokasi: string;
         keterangan?: string;
+        lampiran?: string;
         jumlahSasaran: bigint;
         sasaran: string;
     }): Promise<RKHReport>;

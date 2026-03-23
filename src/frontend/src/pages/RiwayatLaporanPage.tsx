@@ -6,7 +6,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Pencil, Printer } from "lucide-react";
+import { Loader2, Paperclip, Pencil, Printer } from "lucide-react";
 import { useRef, useState } from "react";
 import type { RKHReport, UserProfile } from "../backend.d";
 import { useQueryRKHReports } from "../hooks/useQueries";
@@ -26,6 +26,18 @@ interface RiwayatProps {
 
 const currentYear = new Date().getFullYear();
 const years = Array.from({ length: 5 }, (_, i) => String(currentYear - i));
+
+function getLampiranInfo(
+  lampiran: string | undefined,
+): { name: string; url: string } | null {
+  if (!lampiran) return null;
+  try {
+    const parsed = JSON.parse(lampiran) as { name: string; url: string };
+    return parsed;
+  } catch {
+    return null;
+  }
+}
 
 export default function RiwayatLaporanPage({
   profile,
@@ -195,73 +207,97 @@ export default function RiwayatLaporanPage({
                     <th className="px-4 py-3 text-left hidden lg:table-cell">
                       Hasil Kegiatan
                     </th>
+                    <th className="px-4 py-3 text-center hidden sm:table-cell">
+                      Lampiran
+                    </th>
                     <th className="px-4 py-3 text-center">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-brand-border">
-                  {sorted.map((r, idx) => (
-                    <tr
-                      key={r.id.toString()}
-                      data-ocid={`riwayat.reports.item.${idx + 1}`}
-                      className="hover:bg-gray-50"
-                    >
-                      <td className="px-4 py-3 text-brand-muted">{idx + 1}</td>
-                      <td className="px-4 py-3 whitespace-nowrap text-xs">
-                        {formatTanggal(r.tanggal)}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="line-clamp-2 text-xs">
-                          {r.kegiatan}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 hidden sm:table-cell">
-                        <span
-                          className="inline-block px-2 py-0.5 rounded-full text-xs"
-                          style={{
-                            backgroundColor: "#DFF3E8",
-                            color: "#2E7D5B",
-                          }}
-                        >
-                          {r.sasaran}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-center hidden sm:table-cell text-xs">
-                        {r.jumlahSasaran.toString()}
-                      </td>
-                      <td className="px-4 py-3 hidden md:table-cell text-xs text-brand-muted">
-                        {r.lokasi}
-                      </td>
-                      <td className="px-4 py-3 hidden lg:table-cell">
-                        <span className="line-clamp-2 text-xs text-brand-muted">
-                          {r.hasilKegiatan}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-1.5 justify-center">
-                          {/* Print single report */}
-                          <button
-                            type="button"
-                            title="Cetak laporan ini"
-                            onClick={() => handlePrintSingle(r)}
-                            className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-green-700 transition-colors"
+                  {sorted.map((r, idx) => {
+                    const lampiranInfo = getLampiranInfo(r.lampiran);
+                    return (
+                      <tr
+                        key={r.id.toString()}
+                        data-ocid={`riwayat.reports.item.${idx + 1}`}
+                        className="hover:bg-gray-50"
+                      >
+                        <td className="px-4 py-3 text-brand-muted">
+                          {idx + 1}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-xs">
+                          {formatTanggal(r.tanggal)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="line-clamp-2 text-xs">
+                            {r.kegiatan}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 hidden sm:table-cell">
+                          <span
+                            className="inline-block px-2 py-0.5 rounded-full text-xs"
+                            style={{
+                              backgroundColor: "#DFF3E8",
+                              color: "#2E7D5B",
+                            }}
                           >
-                            <Printer size={14} />
-                          </button>
-                          {/* Edit report - only for non-admin (user owns report) or admin */}
-                          {onNavigate && (
+                            {r.sasaran}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-center hidden sm:table-cell text-xs">
+                          {r.jumlahSasaran.toString()}
+                        </td>
+                        <td className="px-4 py-3 hidden md:table-cell text-xs text-brand-muted">
+                          {r.lokasi}
+                        </td>
+                        <td className="px-4 py-3 hidden lg:table-cell">
+                          <span className="line-clamp-2 text-xs text-brand-muted">
+                            {r.hasilKegiatan}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-center hidden sm:table-cell">
+                          {lampiranInfo ? (
+                            <a
+                              href={lampiranInfo.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title={lampiranInfo.name}
+                              className="inline-flex items-center gap-1 text-xs text-green-700 hover:text-green-900 hover:underline"
+                            >
+                              <Paperclip size={13} />
+                              <span className="max-w-[80px] truncate hidden xl:inline">
+                                {lampiranInfo.name}
+                              </span>
+                            </a>
+                          ) : (
+                            <span className="text-gray-300 text-xs">-</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1.5 justify-center">
                             <button
                               type="button"
-                              title="Edit laporan ini"
-                              onClick={() => onNavigate("edit-rkh", r)}
-                              className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-blue-600 transition-colors"
+                              title="Cetak laporan ini"
+                              onClick={() => handlePrintSingle(r)}
+                              className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-green-700 transition-colors"
                             >
-                              <Pencil size={14} />
+                              <Printer size={14} />
                             </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                            {onNavigate && (
+                              <button
+                                type="button"
+                                title="Edit laporan ini"
+                                onClick={() => onNavigate("edit-rkh", r)}
+                                className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-blue-600 transition-colors"
+                              >
+                                <Pencil size={14} />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

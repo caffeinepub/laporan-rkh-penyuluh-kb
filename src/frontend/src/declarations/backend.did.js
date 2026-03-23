@@ -34,6 +34,14 @@ export const UserProfile = IDL.Record({
   'tandaTangan' : IDL.Opt(IDL.Text),
   'unitKerja' : IDL.Text,
 });
+export const UserTokenEntry = IDL.Record({
+  'user' : IDL.Principal,
+  'token' : IDL.Text,
+});
+export const UserProfileWithPrincipal = IDL.Record({
+  'user' : IDL.Principal,
+  'profile' : UserProfile,
+});
 
 export const idlService = IDL.Service({
   '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
@@ -75,6 +83,8 @@ export const idlService = IDL.Service({
       ['query'],
     ),
   'getAllUserProfiles' : IDL.Func([], [IDL.Vec(UserProfile)], ['query']),
+  'getAllUserProfilesWithPrincipals' : IDL.Func([], [IDL.Vec(UserProfileWithPrincipal)], ['query']),
+  'getAllUserTokens' : IDL.Func([], [IDL.Vec(UserTokenEntry)], ['query']),
   'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
   'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
   'getReportById' : IDL.Func([IDL.Nat], [RKHReport], ['query']),
@@ -84,6 +94,7 @@ export const idlService = IDL.Service({
       [IDL.Opt(UserProfile)],
       ['query'],
     ),
+  'getUserToken' : IDL.Func([IDL.Principal], [IDL.Opt(IDL.Text)], ['query']),
   'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
   'isValidNumaiIndicator' : IDL.Func([IDL.Vec(IDL.Int)], [IDL.Bool], []),
   'queryReports' : IDL.Func(
@@ -99,7 +110,9 @@ export const idlService = IDL.Service({
   'queryReportsYearly' : IDL.Func([IDL.Text], [IDL.Vec(RKHReport)], ['query']),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
   'setUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
+  'setUserToken' : IDL.Func([IDL.Principal, IDL.Text], [], []),
   'updateReport' : IDL.Func([IDL.Vec(RKHReport)], [], []),
+  'validateUserToken' : IDL.Func([IDL.Text], [IDL.Bool], ['query']),
 });
 
 export const idlInitArgs = [];
@@ -130,6 +143,14 @@ export const idlFactory = ({ IDL }) => {
     'jabatan' : IDL.Text,
     'tandaTangan' : IDL.Opt(IDL.Text),
     'unitKerja' : IDL.Text,
+  });
+  const UserTokenEntry = IDL.Record({
+    'user' : IDL.Principal,
+    'token' : IDL.Text,
+  });
+  const UserProfileWithPrincipal = IDL.Record({
+    'user' : IDL.Principal,
+    'profile' : UserProfile,
   });
   
   return IDL.Service({
@@ -172,6 +193,8 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'getAllUserProfiles' : IDL.Func([], [IDL.Vec(UserProfile)], ['query']),
+    'getAllUserProfilesWithPrincipals' : IDL.Func([], [IDL.Vec(UserProfileWithPrincipal)], ['query']),
+    'getAllUserTokens' : IDL.Func([], [IDL.Vec(UserTokenEntry)], ['query']),
     'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
     'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
     'getReportById' : IDL.Func([IDL.Nat], [RKHReport], ['query']),
@@ -181,6 +204,7 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Opt(UserProfile)],
         ['query'],
       ),
+    'getUserToken' : IDL.Func([IDL.Principal], [IDL.Opt(IDL.Text)], ['query']),
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
     'isValidNumaiIndicator' : IDL.Func([IDL.Vec(IDL.Int)], [IDL.Bool], []),
     'queryReports' : IDL.Func(
@@ -200,7 +224,9 @@ export const idlFactory = ({ IDL }) => {
       ),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
     'setUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
+    'setUserToken' : IDL.Func([IDL.Principal, IDL.Text], [], []),
     'updateReport' : IDL.Func([IDL.Vec(RKHReport)], [], []),
+    'validateUserToken' : IDL.Func([IDL.Text], [IDL.Bool], ['query']),
   });
 };
 

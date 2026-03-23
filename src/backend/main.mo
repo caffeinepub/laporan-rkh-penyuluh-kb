@@ -24,6 +24,21 @@ actor {
     tandaTangan : ?Text;
   };
 
+  // Internal stored type — must NOT change to stay compatible with existing stable data
+  type RKHReportStored = {
+    id : Nat;
+    user : Principal;
+    tanggal : Text;
+    kegiatan : Text;
+    sasaran : Text;
+    jumlahSasaran : Nat;
+    lokasi : Text;
+    hasilKegiatan : Text;
+    keterangan : ?Text;
+    createdAt : Int;
+  };
+
+  // Public API type — includes lampiran merged from separate stable map
   type RKHReport = {
     id : Nat;
     user : Principal;
@@ -34,6 +49,7 @@ actor {
     lokasi : Text;
     hasilKegiatan : Text;
     keterangan : ?Text;
+    lampiran : ?Text;
     createdAt : Int;
   };
 
@@ -48,12 +64,32 @@ actor {
   };
 
   var nextReportId = 1;
-  let rkhReports = Map.empty<Nat, RKHReport>();
+  // Original stable var — type unchanged for upgrade compatibility
+  let rkhReports = Map.empty<Nat, RKHReportStored>();
+  // Separate stable var for attachments (new — no compatibility issue)
+  let rkhLampiran = Map.empty<Nat, Text>();
   let userProfiles = Map.empty<Principal, UserProfile>();
   let userTokens = Map.empty<Principal, Text>();
 
   let accessControlState = AccessControl.initState();
   include MixinAuthorization(accessControlState);
+
+  // Merge stored report with its lampiran
+  func withLampiran(r : RKHReportStored) : RKHReport {
+    {
+      id = r.id;
+      user = r.user;
+      tanggal = r.tanggal;
+      kegiatan = r.kegiatan;
+      sasaran = r.sasaran;
+      jumlahSasaran = r.jumlahSasaran;
+      lokasi = r.lokasi;
+      hasilKegiatan = r.hasilKegiatan;
+      keterangan = r.keterangan;
+      lampiran = rkhLampiran.get(r.id);
+      createdAt = r.createdAt;
+    };
+  };
 
   public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
@@ -87,7 +123,6 @@ actor {
     userProfiles.values().toArray();
   };
 
-  // Get all user profiles with their principals (admin only).
   public query ({ caller }) func getAllUserProfilesWithPrincipals() : async [UserProfileWithPrincipal] {
     if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
       Runtime.trap("Unauthorized: Only admin can view all user profiles");
@@ -134,12 +169,13 @@ actor {
     lokasi : Text;
     hasilKegiatan : Text;
     keterangan : ?Text;
+    lampiran : ?Text;
   }) : async RKHReport {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only registered users can create reports");
     };
 
-    let report : RKHReport = {
+    let stored : RKHReportStored = {
       id = nextReportId;
       user = caller;
       tanggal = input.tanggal;
@@ -152,9 +188,13 @@ actor {
       createdAt = Time.now();
     };
 
-    rkhReports.add(nextReportId, report);
+    rkhReports.add(nextReportId, stored);
+    switch (input.lampiran) {
+      case (null) {};
+      case (?lmp) { rkhLampiran.add(nextReportId, lmp) };
+    };
     nextReportId += 1;
-    report;
+    withLampiran(stored);
   };
 
   public query ({ caller }) func getReports() : async [RKHReport] {
@@ -164,10 +204,8 @@ actor {
 
     let isAdmin = AccessControl.isAdmin(accessControlState, caller);
     rkhReports.values().filter(
-      func(report) {
-        isAdmin or report.user == caller;
-      }
-    ).toArray().sort(
+      func(r) { isAdmin or r.user == caller }
+    ).map(withLampiran).toArray().sort(
       func(a, b) { Text.compare(a.tanggal, b.tanggal) }
     );
   };
@@ -176,7 +214,7 @@ actor {
     if (user != caller and not AccessControl.isAdmin(accessControlState, caller)) {
       Runtime.trap("Unauthorized: Can only view your own reports");
     };
-    rkhReports.values().filter(func(report) { report.user == user }).toArray();
+    rkhReports.values().filter(func(r) { r.user == user }).map(withLampiran).toArray();
   };
 
   public query ({ caller }) func filterReportsByUserAndMonth(user : Principal, month : Text) : async [RKHReport] {
@@ -184,10 +222,8 @@ actor {
       Runtime.trap("Unauthorized: Can only view your own reports");
     };
     rkhReports.values().filter(
-      func(report) {
-        report.user == user and report.tanggal.startsWith(#text month);
-      }
-    ).toArray();
+      func(r) { r.user == user and r.tanggal.startsWith(#text month) }
+    ).map(withLampiran).toArray();
   };
 
   public query ({ caller }) func filterReportsByUserAndMonthYear(user : Principal, month : Text, year : Text) : async [RKHReport] {
@@ -195,10 +231,10 @@ actor {
       Runtime.trap("Unauthorized: Can only view your own reports");
     };
     rkhReports.values().filter(
-      func(report) {
-        report.user == user and report.tanggal.startsWith(#text month) and report.tanggal.endsWith(#text year);
+      func(r) {
+        r.user == user and r.tanggal.startsWith(#text month) and r.tanggal.endsWith(#text year);
       }
-    ).toArray();
+    ).map(withLampiran).toArray();
   };
 
   public query ({ caller }) func filterReportsByUserAndYear(user : Principal, year : Text) : async [RKHReport] {
@@ -206,10 +242,8 @@ actor {
       Runtime.trap("Unauthorized: Can only view your own reports");
     };
     rkhReports.values().filter(
-      func(report) {
-        report.user == user and report.tanggal.endsWith(#text year);
-      }
-    ).toArray();
+      func(r) { r.user == user and r.tanggal.endsWith(#text year) }
+    ).map(withLampiran).toArray();
   };
 
   public query ({ caller }) func queryReports(tanggal : ?Text, bulan : ?Text, tahun : ?Text, user : ?Principal) : async [RKHReport] {
@@ -218,35 +252,27 @@ actor {
     };
 
     let isAdmin = AccessControl.isAdmin(accessControlState, caller);
-    let reports = List.empty<RKHReport>();
+    let results = List.empty<RKHReport>();
 
     rkhReports.values().forEach(
       func(r) {
-        if (not isAdmin and r.user != caller) {
-          return;
-        };
+        if (not isAdmin and r.user != caller) { return };
 
         let isMatch = switch (tanggal, bulan, tahun, user) {
-          case (?tanggal, _, _, _) {
-            r.tanggal == tanggal
-          };
-          case (_, ?bulan, _, _) {
-            r.tanggal.startsWith(#text bulan);
-          };
-          case (_, _, ?tahun, _) { r.tanggal.startsWith(#text tahun) };
+          case (?t, _, _, _) { r.tanggal == t };
+          case (_, ?b, _, _) { r.tanggal.startsWith(#text b) };
+          case (_, _, ?y, _) { r.tanggal.startsWith(#text y) };
           case (_, _, _, ?filterUser) {
-            if (not isAdmin and filterUser != caller) {
-              false;
-            } else {
-              r.user == filterUser };
+            if (not isAdmin and filterUser != caller) { false }
+            else { r.user == filterUser };
           };
           case (null, null, null, null) { true };
         };
-        if (isMatch) { reports.add(r) };
+        if (isMatch) { results.add(withLampiran(r)) };
       }
     );
 
-    reports.toArray().sort(
+    results.toArray().sort(
       func(a, b) { Text.compare(a.tanggal, b.tanggal) }
     );
   };
@@ -257,48 +283,29 @@ actor {
     };
 
     let isAdmin = AccessControl.isAdmin(accessControlState, caller);
-    let filtered = rkhReports.values().filter(
-      func(r) {
-        (isAdmin or r.user == caller) and r.tanggal.startsWith(#text filterYear);
-      }
-    );
-    filtered.toArray().sort(
+    rkhReports.values().filter(
+      func(r) { (isAdmin or r.user == caller) and r.tanggal.startsWith(#text filterYear) }
+    ).map(withLampiran).toArray().sort(
       func(a, b) { Text.compare(a.tanggal, b.tanggal) }
     );
   };
 
   public query ({ caller }) func getReportById(reportId : Nat) : async RKHReport {
     switch (rkhReports.get(reportId)) {
-      case (null) {
-        Runtime.trap("Report not found");
-      };
+      case (null) { Runtime.trap("Report not found") };
       case (?r) {
         if (not AccessControl.isAdmin(accessControlState, caller) and not (r.user == caller)) {
           Runtime.trap("Unauthorized: Can only view your own reports");
         };
-        r;
+        withLampiran(r);
       };
     };
-  };
-
-  type ReportUpdate = {
-    id : Nat;
-    tanggal : Text;
-    kegiatan : Text;
-    sasaran : Text;
-    jumlahSasaran : Nat;
-    lokasi : Text;
-    hasilKegiatan : Text;
-    keterangan : ?Text;
-    createdAt : Int;
   };
 
   public shared ({ caller }) func updateReport(reports : [RKHReport]) : async () {
     for (report in reports.values()) {
       switch (rkhReports.get(report.id)) {
-        case (null) {
-          Runtime.trap("Report not found");
-        };
+        case (null) { Runtime.trap("Report not found") };
         case (?existing) {
           if (not (existing.user == caller)) {
             Runtime.trap("Unauthorized: Cannot update reports for other users");
@@ -307,24 +314,53 @@ actor {
       };
     };
 
-    let toUpdate = reports.map(func(r) { r.id });
-    for (newReport in reports.values()) {
-      rkhReports.add(newReport.id, newReport);
+    for (r in reports.values()) {
+      let stored : RKHReportStored = {
+        id = r.id;
+        user = r.user;
+        tanggal = r.tanggal;
+        kegiatan = r.kegiatan;
+        sasaran = r.sasaran;
+        jumlahSasaran = r.jumlahSasaran;
+        lokasi = r.lokasi;
+        hasilKegiatan = r.hasilKegiatan;
+        keterangan = r.keterangan;
+        createdAt = r.createdAt;
+      };
+      rkhReports.add(stored.id, stored);
+      switch (r.lampiran) {
+        case (null) {};
+        case (?lmp) { rkhLampiran.add(r.id, lmp) };
+      };
     };
   };
 
   public shared ({ caller }) func addReport(report : RKHReport) : async () {
     switch (rkhReports.get(report.id)) {
-      case (null) {
-        Runtime.trap("Report not found");
-      };
+      case (null) { Runtime.trap("Report not found") };
       case (?existing) {
         if (not (existing.user == caller)) {
           Runtime.trap("Unauthorized: Cannot create reports for other users");
         };
       };
     };
-    rkhReports.add(report.id, report);
+    let stored : RKHReportStored = {
+      id = report.id;
+      user = report.user;
+      tanggal = report.tanggal;
+      kegiatan = report.kegiatan;
+      sasaran = report.sasaran;
+      jumlahSasaran = report.jumlahSasaran;
+      lokasi = report.lokasi;
+      hasilKegiatan = report.hasilKegiatan;
+      keterangan = report.keterangan;
+      createdAt = report.createdAt;
+    };
+    rkhReports.add(stored.id, stored);
+    switch (report.lampiran) {
+      case (null) {};
+      case (?lmp) { rkhLampiran.add(report.id, lmp) };
+    };
   };
 
   public func isValidNumaiIndicator(numaiIndicator : [Int]) : async Bool {

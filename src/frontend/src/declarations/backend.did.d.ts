@@ -31,6 +31,14 @@ export interface UserProfile {
   'tandaTangan' : [] | [string],
   'unitKerja' : string,
 }
+export interface UserTokenEntry {
+  'user' : Principal,
+  'token' : string,
+}
+export interface UserProfileWithPrincipal {
+  'user' : Principal,
+  'profile' : UserProfile,
+}
 export type UserRole = { 'admin' : null } |
   { 'user' : null } |
   { 'guest' : null };
@@ -66,11 +74,14 @@ export interface _SERVICE {
     Array<RKHReport>
   >,
   'getAllUserProfiles' : ActorMethod<[], Array<UserProfile>>,
+  'getAllUserProfilesWithPrincipals' : ActorMethod<[], Array<UserProfileWithPrincipal>>,
+  'getAllUserTokens' : ActorMethod<[], Array<UserTokenEntry>>,
   'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
   'getReportById' : ActorMethod<[bigint], RKHReport>,
   'getReports' : ActorMethod<[], Array<RKHReport>>,
   'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
+  'getUserToken' : ActorMethod<[Principal], [] | [string]>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
   'isValidNumaiIndicator' : ActorMethod<[Array<bigint>], boolean>,
   'queryReports' : ActorMethod<
@@ -80,7 +91,9 @@ export interface _SERVICE {
   'queryReportsYearly' : ActorMethod<[string], Array<RKHReport>>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
   'setUserRole' : ActorMethod<[Principal, UserRole], undefined>,
+  'setUserToken' : ActorMethod<[Principal, string], undefined>,
   'updateReport' : ActorMethod<[Array<RKHReport>], undefined>,
+  'validateUserToken' : ActorMethod<[string], boolean>,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];
