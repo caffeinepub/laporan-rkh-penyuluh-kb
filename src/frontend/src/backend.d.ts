@@ -28,6 +28,10 @@ export interface UserProfile {
     tandaTangan?: string;
     unitKerja: string;
 }
+export interface UserTokenEntry {
+    user: Principal;
+    token: string;
+}
 export enum UserRole {
     admin = "admin",
     user = "user",
@@ -50,16 +54,20 @@ export interface backendInterface {
     filterReportsByUserAndMonthYear(user: Principal, month: string, year: string): Promise<Array<RKHReport>>;
     filterReportsByUserAndYear(user: Principal, year: string): Promise<Array<RKHReport>>;
     getAllUserProfiles(): Promise<Array<UserProfile>>;
+    getAllUserTokens(): Promise<Array<UserTokenEntry>>;
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
     getReportById(reportId: bigint): Promise<RKHReport>;
     getReports(): Promise<Array<RKHReport>>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
+    getUserToken(user: Principal): Promise<string | null>;
     isCallerAdmin(): Promise<boolean>;
     isValidNumaiIndicator(numaiIndicator: Array<bigint>): Promise<boolean>;
     queryReports(tanggal: string | null, bulan: string | null, tahun: string | null, user: Principal | null): Promise<Array<RKHReport>>;
     queryReportsYearly(filterYear: string): Promise<Array<RKHReport>>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     setUserRole(user: Principal, newRole: UserRole): Promise<void>;
+    setUserToken(user: Principal, token: string): Promise<void>;
     updateReport(reports: Array<RKHReport>): Promise<void>;
+    validateUserToken(token: string): Promise<boolean>;
 }

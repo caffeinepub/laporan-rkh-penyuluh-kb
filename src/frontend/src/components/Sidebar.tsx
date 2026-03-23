@@ -1,10 +1,18 @@
-import { FilePlus, History, LayoutDashboard, Shield, User } from "lucide-react";
+import {
+  FilePlus,
+  History,
+  LayoutDashboard,
+  Lock,
+  Shield,
+  User,
+} from "lucide-react";
 import type { Page } from "../types";
 
 interface SidebarProps {
   currentPage: Page;
   onNavigate: (page: Page) => void;
   isAdmin: boolean;
+  tokenVerified?: boolean;
 }
 
 const navItems: { page: Page; label: string; icon: React.ReactNode }[] = [
@@ -26,6 +34,7 @@ export default function Sidebar({
   currentPage,
   onNavigate,
   isAdmin,
+  tokenVerified = true,
 }: SidebarProps) {
   const items = isAdmin
     ? [
@@ -47,30 +56,39 @@ export default function Sidebar({
           </p>
         </div>
         <nav className="py-2">
-          {items.map((item) => (
-            <button
-              type="button"
-              key={item.page}
-              data-ocid={`sidebar.${item.page}.link`}
-              onClick={() => onNavigate(item.page)}
-              className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
-                currentPage === item.page
-                  ? "bg-brand-sidebarActive text-brand-green font-semibold border-l-2 border-brand-green"
-                  : "text-gray-700 hover:bg-gray-50"
-              }`}
-            >
-              <span
-                className={
-                  currentPage === item.page
-                    ? "text-brand-green"
-                    : "text-brand-muted"
+          {items.map((item) => {
+            const isLocked = !tokenVerified && item.page !== "dashboard";
+            const isActive = currentPage === item.page;
+            return (
+              <button
+                type="button"
+                key={item.page}
+                data-ocid={`sidebar.${item.page}.link`}
+                onClick={() => !isLocked && onNavigate(item.page)}
+                disabled={isLocked}
+                title={
+                  isLocked ? "Verifikasi token terlebih dahulu" : undefined
                 }
+                className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
+                  isLocked
+                    ? "opacity-40 pointer-events-none cursor-not-allowed"
+                    : isActive
+                      ? "bg-brand-sidebarActive text-brand-green font-semibold border-l-2 border-brand-green"
+                      : "text-gray-700 hover:bg-gray-50"
+                }`}
               >
-                {item.icon}
-              </span>
-              {item.label}
-            </button>
-          ))}
+                <span
+                  className={isActive ? "text-brand-green" : "text-brand-muted"}
+                >
+                  {item.icon}
+                </span>
+                <span className="flex-1 text-left">{item.label}</span>
+                {isLocked && (
+                  <Lock size={12} className="text-brand-muted shrink-0" />
+                )}
+              </button>
+            );
+          })}
         </nav>
       </div>
     </aside>

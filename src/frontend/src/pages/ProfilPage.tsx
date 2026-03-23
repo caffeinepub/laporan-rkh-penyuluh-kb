@@ -187,10 +187,9 @@ export default function ProfilPage() {
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
               <div
                 style={{
-                  background: "#000",
-                  border: "2px solid #333",
+                  background: "transparent",
                   borderRadius: "6px",
-                  padding: "8px",
+                  padding: "4px",
                   display: "inline-flex",
                   alignItems: "center",
                   justifyContent: "center",

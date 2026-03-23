@@ -20,16 +20,24 @@ import {
 import { useState } from "react";
 import { toast } from "sonner";
 import type { RKHReport, UserProfile } from "../backend.d";
+import TokenGateDialog from "../components/TokenGateDialog";
 import { useDeleteReport, useGetMyReports } from "../hooks/useQueries";
 import type { Page } from "../types";
 import { BULAN_ID, formatTanggal, getCurrentMonthYear } from "../utils/date";
 
 interface DashboardProps {
+  tokenVerified?: boolean;
+  onTokenVerified?: () => void;
   profile: UserProfile | null;
   onNavigate: (page: Page, editReport?: RKHReport) => void;
 }
 
-export default function DashboardPage({ profile, onNavigate }: DashboardProps) {
+export default function DashboardPage({
+  profile,
+  onNavigate,
+  tokenVerified = true,
+  onTokenVerified,
+}: DashboardProps) {
   const { data: reports = [], isLoading } = useGetMyReports();
   const deleteMutation = useDeleteReport();
   const [search, setSearch] = useState("");
@@ -69,6 +77,9 @@ export default function DashboardPage({ profile, onNavigate }: DashboardProps) {
 
   return (
     <>
+      {!tokenVerified && onTokenVerified && (
+        <TokenGateDialog onTokenVerified={onTokenVerified} />
+      )}
       <div className="bg-white rounded-lg shadow-card p-5 mb-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>

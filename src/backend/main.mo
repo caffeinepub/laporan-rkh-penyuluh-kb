@@ -7,12 +7,12 @@ import List "mo:core/List";
 import Iter "mo:core/Iter";
 import Principal "mo:core/Principal";
 import Array "mo:core/Array";
-import Migration "migration";
+
 import AccessControl "authorization/access-control";
 import MixinAuthorization "authorization/MixinAuthorization";
 
 // Use migration to upgrade from original actor.
-(with migration = Migration.run)
+
 actor {
   type UserRole = AccessControl.UserRole;
 
@@ -40,10 +40,18 @@ actor {
     createdAt : Int;
   };
 
+  // Token entry type for getAllUserTokens response
+  type UserTokenEntry = {
+    user : Principal;
+    token : Text;
+  };
+
   // Original actor state.
   var nextReportId = 1;
   let rkhReports = Map.empty<Nat, RKHReport>();
   let userProfiles = Map.empty<Principal, UserProfile>();
+  // Token storage: Principal -> unique token string
+  let userTokens = Map.empty<Principal, Text>();
 
   // Prefabricated authorization component
   let accessControlState = AccessControl.initState();
@@ -84,6 +92,43 @@ actor {
       Runtime.trap("Unauthorized: Only admin can view all user profiles");
     };
     userProfiles.values().toArray();
+  };
+
+  // --- Token Management ---
+
+  // Admin sets a unique token for a user.
+  public shared ({ caller }) func setUserToken(user : Principal, token : Text) : async () {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Only admin can set user tokens");
+    };
+    userTokens.add(user, token);
+  };
+
+  // Admin gets a specific user's token.
+  public query ({ caller }) func getUserToken(user : Principal) : async ?Text {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Only admin can view user tokens");
+    };
+    userTokens.get(user);
+  };
+
+  // Admin gets all user tokens.
+  public query ({ caller }) func getAllUserTokens() : async [UserTokenEntry] {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Only admin can view all user tokens");
+    };
+    userTokens.entries().map(func(e) : UserTokenEntry { { user = e.0; token = e.1 } }).toArray();
+  };
+
+  // User validates their own token. Returns true if token matches.
+  public query ({ caller }) func validateUserToken(token : Text) : async Bool {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only registered users can validate tokens");
+    };
+    switch (userTokens.get(caller)) {
+      case (null) { false };
+      case (?stored) { stored == token };
+    };
   };
 
   // Create new RKH report (must have user profile).

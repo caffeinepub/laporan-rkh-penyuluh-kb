@@ -3,6 +3,7 @@ import {
   FilePlus,
   History,
   LayoutDashboard,
+  Lock,
   LogOut,
   Menu,
   Shield,
@@ -19,6 +20,7 @@ interface HeaderProps {
   isAdmin: boolean;
   mobileMenuOpen: boolean;
   onToggleMobileMenu: () => void;
+  tokenVerified?: boolean;
 }
 
 const navItems: { page: Page; label: string; icon: React.ReactNode }[] = [
@@ -39,6 +41,7 @@ export default function Header({
   isAdmin,
   mobileMenuOpen,
   onToggleMobileMenu,
+  tokenVerified = true,
 }: HeaderProps) {
   const { clear } = useInternetIdentity();
   const qc = useQueryClient();
@@ -64,19 +67,11 @@ export default function Header({
       {/* Tier 1: Branding strip */}
       <div className="bg-white flex items-center justify-between px-4 py-2 border-b border-brand-border">
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-gradStart to-brand-gradEnd flex items-center justify-center">
-              <span className="text-white font-bold text-xs">BKKBN</span>
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-brand-nav leading-tight">
-                BADAN KEPENDUDUKAN
-              </p>
-              <p className="text-[10px] text-brand-nav leading-tight">
-                KELUARGA BERENCANA NASIONAL
-              </p>
-            </div>
-          </div>
+          <img
+            src="/assets/uploads/Logo_Kementerian_Kependudukan_dan_Pembangunan_Keluarga_-_BKKBN_-2024-.svg-1.png"
+            alt="Logo BKKBN"
+            className="h-12 w-auto object-contain"
+          />
         </div>
         <div
           className="hidden sm:flex flex-1 mx-4 rounded-lg px-4 py-2 items-center justify-center"
@@ -89,21 +84,6 @@ export default function Header({
           </h1>
         </div>
         <div className="flex items-center gap-2">
-          <div className="hidden sm:flex items-center gap-2">
-            <div className="w-9 h-9 rounded-full bg-blue-700 flex items-center justify-center">
-              <span className="text-white font-bold text-[8px] text-center leading-tight">
-                KEMKES
-              </span>
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-brand-nav leading-tight">
-                KEMENTERIAN
-              </p>
-              <p className="text-[10px] text-brand-nav leading-tight">
-                KESEHATAN RI
-              </p>
-            </div>
-          </div>
           <button
             type="button"
             className="sm:hidden p-1 text-brand-nav"
@@ -119,22 +99,32 @@ export default function Header({
       {/* Tier 2: Navigation bar */}
       <nav className="bg-brand-nav px-2 py-0 flex items-center justify-between">
         <div className="flex items-center">
-          {allNavItems.map((item) => (
-            <button
-              type="button"
-              key={item.page}
-              data-ocid={`nav.${item.page}.link`}
-              onClick={() => onNavigate(item.page)}
-              className={`flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium transition-colors ${
-                currentPage === item.page
-                  ? "text-white border-b-2 border-brand-gradEnd bg-white/10"
-                  : "text-white/70 hover:text-white hover:bg-white/10"
-              }`}
-            >
-              {item.icon}
-              <span className="hidden md:inline">{item.label}</span>
-            </button>
-          ))}
+          {allNavItems.map((item) => {
+            const isLocked = !tokenVerified && item.page !== "dashboard";
+            return (
+              <button
+                type="button"
+                key={item.page}
+                data-ocid={`nav.${item.page}.link`}
+                onClick={() => !isLocked && onNavigate(item.page)}
+                disabled={isLocked}
+                title={
+                  isLocked ? "Verifikasi token terlebih dahulu" : undefined
+                }
+                className={`flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium transition-colors ${
+                  isLocked
+                    ? "text-white/30 pointer-events-none cursor-not-allowed"
+                    : currentPage === item.page
+                      ? "text-white border-b-2 border-brand-gradEnd bg-white/10"
+                      : "text-white/70 hover:text-white hover:bg-white/10"
+                }`}
+              >
+                {item.icon}
+                <span className="hidden md:inline">{item.label}</span>
+                {isLocked && <Lock size={11} className="opacity-60" />}
+              </button>
+            );
+          })}
         </div>
         <div className="flex items-center gap-2 pr-2">
           {profile && (
@@ -161,24 +151,33 @@ export default function Header({
 
       {mobileMenuOpen && (
         <div className="sm:hidden bg-brand-nav border-t border-white/10">
-          {allNavItems.map((item) => (
-            <button
-              type="button"
-              key={item.page}
-              onClick={() => {
-                onNavigate(item.page);
-                onToggleMobileMenu();
-              }}
-              className={`w-full flex items-center gap-2 px-4 py-3 text-sm ${
-                currentPage === item.page
-                  ? "text-white bg-white/10"
-                  : "text-white/70"
-              }`}
-            >
-              {item.icon}
-              {item.label}
-            </button>
-          ))}
+          {allNavItems.map((item) => {
+            const isLocked = !tokenVerified && item.page !== "dashboard";
+            return (
+              <button
+                type="button"
+                key={item.page}
+                onClick={() => {
+                  if (!isLocked) {
+                    onNavigate(item.page);
+                    onToggleMobileMenu();
+                  }
+                }}
+                disabled={isLocked}
+                className={`w-full flex items-center gap-2 px-4 py-3 text-sm ${
+                  isLocked
+                    ? "text-white/30"
+                    : currentPage === item.page
+                      ? "text-white bg-white/10"
+                      : "text-white/70"
+                }`}
+              >
+                {item.icon}
+                {item.label}
+                {isLocked && <Lock size={12} className="ml-auto" />}
+              </button>
+            );
+          })}
         </div>
       )}
     </header>

@@ -1,7 +1,22 @@
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BarChart3, FileText, Loader2, Users } from "lucide-react";
+import {
+  BarChart3,
+  FileText,
+  KeyRound,
+  Loader2,
+  RefreshCw,
+  Users,
+} from "lucide-react";
 import { useState } from "react";
-import { useGetAllReports, useGetAllUserProfiles } from "../hooks/useQueries";
+import { toast } from "sonner";
+import {
+  useGetAllReports,
+  useGetAllUserProfiles,
+  useGetAllUserTokens,
+  useSetUserToken,
+} from "../hooks/useQueries";
 import { BULAN_ID, formatTanggal } from "../utils/date";
 
 export default function AdminPage() {
@@ -56,6 +71,13 @@ export default function AdminPage() {
             className="flex items-center gap-1.5 text-xs"
           >
             <BarChart3 size={13} /> Rekap
+          </TabsTrigger>
+          <TabsTrigger
+            value="tokens"
+            data-ocid="admin.tokens.tab"
+            className="flex items-center gap-1.5 text-xs"
+          >
+            <KeyRound size={13} /> Token Akses
           </TabsTrigger>
         </TabsList>
 
@@ -346,7 +368,247 @@ export default function AdminPage() {
             </div>
           </div>
         </TabsContent>
+        <TabsContent value="tokens">
+          <TokenAksesTab
+            profiles={profiles}
+            profilesLoading={profilesLoading}
+          />
+        </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+function generateToken() {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  return Array.from(
+    { length: 8 },
+    () => chars[Math.floor(Math.random() * chars.length)],
+  ).join("");
+}
+
+function TokenAksesTab({
+  profiles,
+  profilesLoading,
+}: {
+  profiles: import("../backend.d").UserProfile[];
+  profilesLoading: boolean;
+}) {
+  const {
+    data: tokenEntries = [],
+    isLoading: tokensLoading,
+    refetch,
+  } = useGetAllUserTokens();
+  const setTokenMutation = useSetUserToken();
+  const [editingNip, setEditingNip] = useState<string | null>(null);
+  const [tokenInputs, setTokenInputs] = useState<Record<string, string>>({});
+
+  // Build a map nip -> principal from profiles (profiles have nip, not principal directly)
+  // We need principal to call setUserToken. But getUserProfile uses Principal.
+  // For now, we use the token entries to match user.
+  const tokenMap: Record<string, string> = {};
+  for (const entry of tokenEntries) {
+    tokenMap[entry.user.toString()] = entry.token;
+  }
+
+  const handleSave = async (profile: import("../backend.d").UserProfile) => {
+    const newToken = tokenInputs[profile.nip] ?? "";
+    if (!newToken.trim()) {
+      toast.error("Token tidak boleh kosong");
+      return;
+    }
+    // We need to find the principal for this user from token entries or just set by nip
+    // Since backend setUserToken takes Principal, we need to match via tokenEntries
+    // For profiles, we match by checking if any tokenEntry user toString contains nip
+    const entry = tokenEntries.find((e) =>
+      e.user.toString().includes(profile.nip),
+    );
+    if (!entry) {
+      toast.error(
+        "Tidak dapat menemukan principal pengguna ini. Pastikan pengguna sudah login minimal sekali.",
+      );
+      return;
+    }
+    try {
+      await setTokenMutation.mutateAsync({
+        user: entry.user,
+        token: newToken.trim(),
+      });
+      toast.success(`Token untuk ${profile.nama} berhasil disimpan`);
+      setEditingNip(null);
+      refetch();
+    } catch {
+      toast.error("Gagal menyimpan token");
+    }
+  };
+
+  if (profilesLoading || tokensLoading) {
+    return (
+      <div
+        data-ocid="admin.tokens.loading_state"
+        className="flex justify-center py-12"
+      >
+        <Loader2 className="animate-spin text-brand-green" size={24} />
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-xs text-brand-muted">
+          Kelola token akses unik untuk setiap pengguna. Token digunakan untuk
+          verifikasi saat masuk dashboard.
+        </p>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="text-xs"
+          onClick={() => refetch()}
+          data-ocid="admin.tokens.secondary_button"
+        >
+          <RefreshCw size={12} className="mr-1" /> Refresh
+        </Button>
+      </div>
+      {profiles.length === 0 ? (
+        <div data-ocid="admin.tokens.empty_state" className="text-center py-12">
+          <p className="text-sm text-brand-muted">
+            Belum ada pengguna terdaftar
+          </p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm" data-ocid="admin.tokens.table">
+            <thead className="bg-gray-50 text-xs font-semibold text-brand-muted uppercase">
+              <tr>
+                <th className="px-4 py-3 text-left">No</th>
+                <th className="px-4 py-3 text-left">Nama</th>
+                <th className="px-4 py-3 text-left hidden md:table-cell">
+                  NIP
+                </th>
+                <th className="px-4 py-3 text-left">Token</th>
+                <th className="px-4 py-3 text-center">Aksi</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-brand-border">
+              {profiles.map((p, idx) => {
+                const isEditing = editingNip === p.nip;
+                const currentToken = tokenEntries.find((e) =>
+                  e.user.toString().includes(p.nip),
+                )?.token;
+                return (
+                  <tr
+                    key={p.nip}
+                    data-ocid={`admin.tokens.item.${idx + 1}`}
+                    className="hover:bg-gray-50"
+                  >
+                    <td className="px-4 py-3 text-brand-muted">{idx + 1}</td>
+                    <td className="px-4 py-3 font-medium">{p.nama}</td>
+                    <td className="px-4 py-3 hidden md:table-cell text-xs text-brand-muted">
+                      {p.nip}
+                    </td>
+                    <td className="px-4 py-3">
+                      {isEditing ? (
+                        <div className="flex items-center gap-2">
+                          <Input
+                            data-ocid={"admin.tokens.input"}
+                            className="h-8 text-xs font-mono w-40"
+                            value={tokenInputs[p.nip] ?? ""}
+                            onChange={(e) =>
+                              setTokenInputs((prev) => ({
+                                ...prev,
+                                [p.nip]: e.target.value,
+                              }))
+                            }
+                            placeholder="Masukkan token"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-8 text-xs"
+                            onClick={() => {
+                              const gen = generateToken();
+                              setTokenInputs((prev) => ({
+                                ...prev,
+                                [p.nip]: gen,
+                              }));
+                            }}
+                            data-ocid={"admin.tokens.secondary_button"}
+                            title="Generate token acak"
+                          >
+                            <RefreshCw size={11} />
+                          </Button>
+                        </div>
+                      ) : (
+                        <span
+                          className={`font-mono text-xs px-2 py-1 rounded ${
+                            currentToken
+                              ? "bg-green-50 text-green-700"
+                              : "bg-gray-100 text-gray-400"
+                          }`}
+                        >
+                          {currentToken ?? "Belum diatur"}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      {isEditing ? (
+                        <div className="flex items-center justify-center gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="h-8 text-xs"
+                            onClick={() => handleSave(p)}
+                            disabled={setTokenMutation.isPending}
+                            data-ocid={"admin.tokens.save_button"}
+                            style={{ background: "#1F8A63", color: "#fff" }}
+                          >
+                            {setTokenMutation.isPending ? (
+                              <Loader2 size={12} className="animate-spin" />
+                            ) : (
+                              "Simpan"
+                            )}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-8 text-xs"
+                            onClick={() => setEditingNip(null)}
+                            data-ocid={"admin.tokens.cancel_button"}
+                          >
+                            Batal
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-8 text-xs"
+                          onClick={() => {
+                            setEditingNip(p.nip);
+                            setTokenInputs((prev) => ({
+                              ...prev,
+                              [p.nip]: currentToken ?? "",
+                            }));
+                          }}
+                          data-ocid={"admin.tokens.edit_button"}
+                        >
+                          <KeyRound size={12} className="mr-1" />
+                          Set Token
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

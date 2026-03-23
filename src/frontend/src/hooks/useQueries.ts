@@ -1,6 +1,11 @@
 import type { Principal } from "@icp-sdk/core/principal";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { RKHReport, UserProfile, UserRole } from "../backend.d";
+import type {
+  backendInterface as BackendDInterface,
+  RKHReport,
+  UserProfile,
+  UserRole,
+} from "../backend.d";
 import { useActor } from "./useActor";
 
 // ---- Profile ----
@@ -70,10 +75,25 @@ export function useQueryRKHReports(filter: {
     queryKey: ["queryRKHReports", filter],
     queryFn: async () => {
       if (!actor) return [];
+
+      let bulanFilter: string | null = null;
+      let tahunFilter: string | null = null;
+
+      if (filter.bulan && filter.tahun) {
+        bulanFilter = `${filter.tahun}-${filter.bulan}`;
+        tahunFilter = null;
+      } else if (filter.bulan) {
+        bulanFilter = filter.bulan;
+        tahunFilter = null;
+      } else if (filter.tahun) {
+        bulanFilter = filter.tahun;
+        tahunFilter = null;
+      }
+
       return actor.queryReports(
         filter.tanggal ?? null,
-        filter.bulan ?? null,
-        filter.tahun ?? null,
+        bulanFilter,
+        tahunFilter,
         filter.user ?? null,
       );
     },
@@ -137,7 +157,6 @@ export function useUpdateReport() {
       };
     }) => {
       if (!actor) throw new Error("Actor not available");
-      // updateReport in backend takes array of RKHReport
       return actor.updateReport([data as unknown as RKHReport]);
     },
     onSuccess: () => {
@@ -198,5 +217,40 @@ export function useSetUserRole() {
       await actor.setUserRole(user, role);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["allUserProfiles"] }),
+  });
+}
+
+// ---- Token ----
+export function useValidateUserToken() {
+  const { actor } = useActor();
+  return useMutation({
+    mutationFn: async (token: string) => {
+      if (!actor) throw new Error("Actor not available");
+      return (actor as unknown as BackendDInterface).validateUserToken(token);
+    },
+  });
+}
+
+export function useSetUserToken() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ user, token }: { user: Principal; token: string }) => {
+      if (!actor) throw new Error("Actor not available");
+      await (actor as unknown as BackendDInterface).setUserToken(user, token);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["allUserTokens"] }),
+  });
+}
+
+export function useGetAllUserTokens() {
+  const { actor, isFetching: actorFetching } = useActor();
+  return useQuery({
+    queryKey: ["allUserTokens"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return (actor as unknown as BackendDInterface).getAllUserTokens();
+    },
+    enabled: !!actor && !actorFetching,
   });
 }

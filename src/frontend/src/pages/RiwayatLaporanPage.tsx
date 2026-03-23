@@ -6,10 +6,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Printer } from "lucide-react";
+import { Loader2, Pencil, Printer } from "lucide-react";
 import { useRef, useState } from "react";
-import type { UserProfile } from "../backend.d";
+import type { RKHReport, UserProfile } from "../backend.d";
 import { useQueryRKHReports } from "../hooks/useQueries";
+import type { Page } from "../types";
 import {
   BULAN_ID,
   formatMonthYear,
@@ -19,15 +20,22 @@ import {
 
 interface RiwayatProps {
   profile: UserProfile | null;
+  isAdmin?: boolean;
+  onNavigate?: (page: Page, report?: RKHReport) => void;
 }
 
 const currentYear = new Date().getFullYear();
 const years = Array.from({ length: 5 }, (_, i) => String(currentYear - i));
 
-export default function RiwayatLaporanPage({ profile }: RiwayatProps) {
+export default function RiwayatLaporanPage({
+  profile,
+  isAdmin = false,
+  onNavigate,
+}: RiwayatProps) {
   const { bulan: initBulan, tahun: initTahun } = getCurrentMonthYear();
   const [bulan, setBulan] = useState(initBulan);
   const [tahun, setTahun] = useState(initTahun);
+  const [printReport, setPrintReport] = useState<RKHReport | null>(null);
   const printRef = useRef<HTMLDivElement>(null);
 
   const { data: reports = [], isLoading } = useQueryRKHReports({
@@ -38,9 +46,24 @@ export default function RiwayatLaporanPage({ profile }: RiwayatProps) {
     a.tanggal.localeCompare(b.tanggal),
   );
 
-  const handlePrint = () => window.print();
+  const handlePrintSingle = (report: RKHReport) => {
+    setPrintReport(report);
+    setTimeout(() => window.print(), 100);
+  };
+
+  const handlePrintAll = () => {
+    setPrintReport(null);
+    setTimeout(() => window.print(), 100);
+  };
+
   const bulanName = formatMonthYear(bulan, tahun);
   const tandaTangan = profile?.tandaTangan ?? null;
+
+  // Determine what to print
+  const printRows = printReport ? [printReport] : sorted;
+  const printTitle = printReport
+    ? `Laporan Tanggal ${formatTanggal(printReport.tanggal)}`
+    : `Laporan Bulan ${bulanName}`;
 
   return (
     <>
@@ -51,15 +74,18 @@ export default function RiwayatLaporanPage({ profile }: RiwayatProps) {
             <h2 className="text-base font-bold text-brand-nav">
               Riwayat Laporan RKH
             </h2>
-            <Button
-              data-ocid="riwayat.print.primary_button"
-              onClick={handlePrint}
-              className="flex items-center gap-1.5 text-white text-xs px-3 py-2 h-auto"
-              style={{ backgroundColor: "#2E7D5B" }}
-            >
-              <Printer size={14} />
-              Cetak Laporan
-            </Button>
+            {/* Combined print: admin only */}
+            {isAdmin && (
+              <Button
+                data-ocid="riwayat.print.primary_button"
+                onClick={handlePrintAll}
+                className="flex items-center gap-1.5 text-white text-xs px-3 py-2 h-auto"
+                style={{ backgroundColor: "#2E7D5B" }}
+              >
+                <Printer size={14} />
+                Cetak Laporan Gabungan
+              </Button>
+            )}
           </div>
 
           <div className="flex flex-wrap gap-3 mt-4">
@@ -169,6 +195,7 @@ export default function RiwayatLaporanPage({ profile }: RiwayatProps) {
                     <th className="px-4 py-3 text-left hidden lg:table-cell">
                       Hasil Kegiatan
                     </th>
+                    <th className="px-4 py-3 text-center">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-brand-border">
@@ -209,6 +236,30 @@ export default function RiwayatLaporanPage({ profile }: RiwayatProps) {
                           {r.hasilKegiatan}
                         </span>
                       </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1.5 justify-center">
+                          {/* Print single report */}
+                          <button
+                            type="button"
+                            title="Cetak laporan ini"
+                            onClick={() => handlePrintSingle(r)}
+                            className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-green-700 transition-colors"
+                          >
+                            <Printer size={14} />
+                          </button>
+                          {/* Edit report - only for non-admin (user owns report) or admin */}
+                          {onNavigate && (
+                            <button
+                              type="button"
+                              title="Edit laporan ini"
+                              onClick={() => onNavigate("edit-rkh", r)}
+                              className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-blue-600 transition-colors"
+                            >
+                              <Pencil size={14} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -233,33 +284,14 @@ export default function RiwayatLaporanPage({ profile }: RiwayatProps) {
               display: "flex",
               justifyContent: "center",
               alignItems: "center",
-              gap: "16px",
               marginBottom: "8px",
             }}
           >
-            <div
-              style={{
-                width: "60px",
-                height: "60px",
-                borderRadius: "50%",
-                background: "#2E7D5B",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <span
-                style={{ color: "white", fontWeight: "bold", fontSize: "12px" }}
-              >
-                BKKBN
-              </span>
-            </div>
-            <div>
-              <p style={{ fontWeight: "bold", fontSize: "11pt", margin: 0 }}>
-                BADAN KEPENDUDUKAN DAN KELUARGA BERENCANA NASIONAL
-              </p>
-              <p style={{ fontSize: "9pt", margin: 0 }}>Perwakilan Provinsi</p>
-            </div>
+            <img
+              src="/assets/uploads/Logo_Kementerian_Kependudukan_dan_Pembangunan_Keluarga_-_BKKBN_-2024-.svg-1.png"
+              alt="Logo BKKBN"
+              style={{ width: "80px", height: "80px", objectFit: "contain" }}
+            />
           </div>
           <h2
             style={{
@@ -274,7 +306,7 @@ export default function RiwayatLaporanPage({ profile }: RiwayatProps) {
           <p style={{ fontSize: "10pt", margin: 0 }}>
             PENYULUH KELUARGA BERENCANA
           </p>
-          <p style={{ fontSize: "10pt", margin: 0 }}>Periode: {bulanName}</p>
+          <p style={{ fontSize: "10pt", margin: 0 }}>Periode: {printTitle}</p>
         </div>
 
         <div style={{ marginBottom: "16px", fontSize: "10pt" }}>
@@ -340,7 +372,7 @@ export default function RiwayatLaporanPage({ profile }: RiwayatProps) {
             </tr>
           </thead>
           <tbody>
-            {sorted.map((r, idx) => (
+            {printRows.map((r, idx) => (
               <tr key={r.id.toString()}>
                 <td style={{ border: "1px solid #999", padding: "5px 8px" }}>
                   {idx + 1}
@@ -395,17 +427,14 @@ export default function RiwayatLaporanPage({ profile }: RiwayatProps) {
             <p style={{ marginBottom: "2px" }}>Mengetahui,</p>
             <p style={{ marginBottom: "8px" }}>Koordinator Penyuluh KB</p>
 
-            {/* Signature image box - black box with signature */}
             <div
               style={{
                 width: "120px",
                 height: "60px",
-                border: "2px solid #000",
                 margin: "0 auto 4px",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                background: tandaTangan ? "#000" : "transparent",
                 overflow: "hidden",
               }}
             >

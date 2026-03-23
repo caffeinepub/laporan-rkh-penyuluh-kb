@@ -1,5 +1,4 @@
 import { Toaster } from "@/components/ui/sonner";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 import type { RKHReport } from "./backend.d";
 import { useInternetIdentity } from "./hooks/useInternetIdentity";
@@ -17,9 +16,7 @@ import ProfilPage from "./pages/ProfilPage";
 import ProfileSetupPage from "./pages/ProfileSetupPage";
 import RiwayatLaporanPage from "./pages/RiwayatLaporanPage";
 
-const queryClient = new QueryClient();
-
-function AppInner() {
+export default function App() {
   const { identity, isInitializing } = useInternetIdentity();
   const isAuthenticated = !!identity;
 
@@ -34,6 +31,17 @@ function AppInner() {
   const [editReport, setEditReport] = useState<RKHReport | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  const [tokenVerified, setTokenVerified] = useState<boolean>(
+    () => sessionStorage.getItem("tokenVerified") === "true",
+  );
+
+  const handleTokenVerified = () => {
+    sessionStorage.setItem("tokenVerified", "true");
+    setTokenVerified(true);
+  };
+
+  const effectiveTokenVerified = isAdmin || tokenVerified;
+
   const handleNavigate = (page: Page, report?: RKHReport) => {
     setCurrentPage(page);
     setEditReport(report ?? null);
@@ -41,7 +49,6 @@ function AppInner() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // Loading state
   if (isInitializing || (isAuthenticated && profileLoading)) {
     return (
       <div className="min-h-screen bg-brand-bg flex items-center justify-center">
@@ -60,12 +67,10 @@ function AppInner() {
     );
   }
 
-  // Not authenticated
   if (!isAuthenticated) {
     return <LoginPage />;
   }
 
-  // Authenticated but no profile yet
   const showProfileSetup =
     isAuthenticated && !profileLoading && isFetched && profile === null;
   if (showProfileSetup) {
@@ -81,7 +86,13 @@ function AppInner() {
           <InputRKHPage onNavigate={handleNavigate} editReport={editReport} />
         );
       case "riwayat":
-        return <RiwayatLaporanPage profile={profile ?? null} />;
+        return (
+          <RiwayatLaporanPage
+            profile={profile ?? null}
+            isAdmin={isAdmin}
+            onNavigate={handleNavigate}
+          />
+        );
       case "profil":
         return <ProfilPage />;
       case "admin":
@@ -91,6 +102,8 @@ function AppInner() {
           <DashboardPage
             profile={profile ?? null}
             onNavigate={handleNavigate}
+            tokenVerified={effectiveTokenVerified}
+            onTokenVerified={handleTokenVerified}
           />
         );
       default:
@@ -98,6 +111,8 @@ function AppInner() {
           <DashboardPage
             profile={profile ?? null}
             onNavigate={handleNavigate}
+            tokenVerified={effectiveTokenVerified}
+            onTokenVerified={handleTokenVerified}
           />
         );
     }
@@ -112,20 +127,19 @@ function AppInner() {
         isAdmin={isAdmin}
         mobileMenuOpen={mobileMenuOpen}
         onToggleMobileMenu={() => setMobileMenuOpen((v) => !v)}
+        tokenVerified={effectiveTokenVerified}
       />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-4 py-5">
         <div className="flex gap-4">
-          {/* Left sidebar - hidden on mobile */}
           <div className="hidden lg:block">
             <Sidebar
               currentPage={currentPage}
               onNavigate={handleNavigate}
               isAdmin={isAdmin}
+              tokenVerified={effectiveTokenVerified}
             />
           </div>
-
-          {/* Main content */}
           <div className="flex-1 min-w-0">{renderPage()}</div>
         </div>
       </main>
@@ -133,13 +147,5 @@ function AppInner() {
       <Footer />
       <Toaster richColors />
     </div>
-  );
-}
-
-export default function App() {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <AppInner />
-    </QueryClientProvider>
   );
 }
