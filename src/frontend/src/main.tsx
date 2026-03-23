@@ -17,14 +17,12 @@ declare global {
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // Cache data for 5 minutes before refetching
-      staleTime: 5 * 60 * 1000,
-      // Keep data in cache for 10 minutes after component unmounts
-      gcTime: 10 * 60 * 1000,
-      // Don't retry on error more than once
-      retry: 1,
-      // Don't refetch on window focus (reduces unnecessary calls)
+      // Don't refetch on window focus or reconnect -- reduces unnecessary backend calls
       refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+      // Keep data for 5 minutes before considering stale
+      staleTime: 5 * 60 * 1000,
+      retry: 1,
     },
   },
 });

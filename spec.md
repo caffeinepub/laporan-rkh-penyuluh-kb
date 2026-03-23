@@ -1,22 +1,23 @@
 # Laporan RKH Penyuluh KB
 
 ## Current State
-Admin panel has a Token Akses tab. The handleSave function tries to find the user's Principal by checking if `entry.user.toString().includes(profile.nip)` -- this always fails because a Principal string never contains the NIP.
+App loads slowly due to multiple initialization cycles in `useInternetIdentity` and excessive query refetching in `useActor`.
 
 ## Requested Changes (Diff)
 
 ### Add
-- Backend function `getAllUserProfilesWithPrincipals()` returning `[{user: Principal, profile: UserProfile}]`
-- Frontend hook `useGetAllUserProfilesWithPrincipals()`
+- `useRef`-based single-run initialization guard in `useInternetIdentity`
+- Default QueryClient options: `refetchOnWindowFocus: false`, `refetchOnReconnect: false`, `staleTime: 5min`
 
 ### Modify
-- TokenAksesTab: use principal-mapped data to correctly find Principal by NIP when saving token
+- `useInternetIdentity`: Remove `authClient` from `useEffect` dependency array; use `useRef` to store client so effect only runs once on mount
+- `useActor`: Remove `useQueryClient` + `useEffect` block that invalidated/refetched all queries on actor change (was causing cascading backend calls)
+- `main.tsx`: Add QueryClient defaultOptions to reduce unnecessary refetches
 
 ### Remove
-- Broken logic replaced with correct principal lookup
+- N/A
 
 ## Implementation Plan
-1. Add `getAllUserProfilesWithPrincipals` to backend
-2. Update backend.d.ts
-3. Add hook in useQueries.ts
-4. Fix TokenAksesTab in AdminPage.tsx
+1. Fix `useInternetIdentity` to initialize AuthClient only once using `useRef`
+2. Simplify `useActor` to remove aggressive query invalidation
+3. Configure QueryClient with conservative default staleTime and disable focus/reconnect refetching
