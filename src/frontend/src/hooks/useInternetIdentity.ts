@@ -88,8 +88,9 @@ export function InternetIdentityProvider({
   children: ReactNode;
   createOptions?: AuthClientCreateOptions;
 }>) {
-  const authClientRef = useRef<AuthClient | null>(null);
-  const initDoneRef = useRef(false);
+  const authClientRef = useRef<AuthClient | undefined>(undefined);
+  const initializedRef = useRef(false);
+  const createOptionsRef = useRef(createOptions);
   const [identity, setIdentity] = useState<Identity | undefined>(undefined);
   const [loginStatus, setStatus] = useState<Status>("initializing");
   const [loginError, setError] = useState<Error | undefined>(undefined);
@@ -119,7 +120,7 @@ export function InternetIdentityProvider({
   const login = useCallback(() => {
     const authClient = authClientRef.current;
     if (!authClient) {
-      setErrorMessage("AuthClient not initialized yet.");
+      setErrorMessage("AuthClient is not initialized yet.");
       return;
     }
 
@@ -154,7 +155,8 @@ export function InternetIdentityProvider({
     void authClient
       .logout()
       .then(() => {
-        authClientRef.current = null;
+        authClientRef.current = undefined;
+        initializedRef.current = false;
         setIdentity(undefined);
         setStatus("idle");
         setError(undefined);
@@ -169,19 +171,19 @@ export function InternetIdentityProvider({
       });
   }, [setErrorMessage]);
 
-  // Initialize ONCE on mount only
-  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional mount-only effect
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally run once on mount only
   useEffect(() => {
-    if (initDoneRef.current) return;
-    initDoneRef.current = true;
+    if (initializedRef.current) return;
+    initializedRef.current = true;
 
     void (async () => {
       try {
-        const authClient = await createAuthClient(createOptions);
-        authClientRef.current = authClient;
-        const isAuthenticated = await authClient.isAuthenticated();
+        setStatus("initializing");
+        const client = await createAuthClient(createOptionsRef.current);
+        authClientRef.current = client;
+        const isAuthenticated = await client.isAuthenticated();
         if (isAuthenticated) {
-          const loadedIdentity = authClient.getIdentity();
+          const loadedIdentity = client.getIdentity();
           setIdentity(loadedIdentity);
         }
       } catch (unknownError) {
@@ -195,7 +197,7 @@ export function InternetIdentityProvider({
         setStatus("idle");
       }
     })();
-  }, []); // Only run once on mount
+  }, []);
 
   const value = useMemo<ProviderValue>(
     () => ({

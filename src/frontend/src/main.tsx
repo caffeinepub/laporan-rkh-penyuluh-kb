@@ -14,18 +14,7 @@ declare global {
   }
 }
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      // Don't refetch on window focus or reconnect -- reduces unnecessary backend calls
-      refetchOnWindowFocus: false,
-      refetchOnReconnect: false,
-      // Keep data for 5 minutes before considering stale
-      staleTime: 5 * 60 * 1000,
-      retry: 1,
-    },
-  },
-});
+const queryClient = new QueryClient();
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <QueryClientProvider client={queryClient}>
