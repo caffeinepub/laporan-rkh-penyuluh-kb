@@ -62,7 +62,7 @@ async function createAuthClient(
     },
     ...createOptions,
   };
-  return await AuthClient.create(options);
+  return AuthClient.create(options);
 }
 
 function assertProviderPresent(
@@ -88,12 +88,10 @@ export function InternetIdentityProvider({
   children: ReactNode;
   createOptions?: AuthClientCreateOptions;
 }>) {
-  // Use ref for authClient so it never triggers re-renders or effect re-runs
+  // Store authClient and createOptions in refs -- NEVER as state dependencies
   const authClientRef = useRef<AuthClient | undefined>(undefined);
-  // Guard: ensure initialization runs exactly once
-  const initDoneRef = useRef(false);
-  // Capture createOptions in ref so it can be used in effect without being a reactive dep
   const createOptionsRef = useRef(createOptions);
+  const initDoneRef = useRef(false);
 
   const [identity, setIdentity] = useState<Identity | undefined>(undefined);
   const [loginStatus, setStatus] = useState<Status>("initializing");
@@ -105,16 +103,14 @@ export function InternetIdentityProvider({
   }, []);
 
   const handleLoginSuccess = useCallback(() => {
-    const client = authClientRef.current;
-    const latestIdentity = client?.getIdentity();
+    const latestIdentity = authClientRef.current?.getIdentity();
     if (!latestIdentity) {
-      setStatus("loginError");
-      setError(new Error("Identity not found after successful login"));
+      setErrorMessage("Identity not found after successful login");
       return;
     }
     setIdentity(latestIdentity);
     setStatus("success");
-  }, []);
+  }, [setErrorMessage]);
 
   const handleLoginError = useCallback(
     (maybeError?: string) => {
@@ -127,7 +123,7 @@ export function InternetIdentityProvider({
     const client = authClientRef.current;
     if (!client) {
       setErrorMessage(
-        "AuthClient is not initialized yet, make sure to call login on user interaction.",
+        "AuthClient is not initialized yet, make sure to call `login` on user interaction e.g. click.",
       );
       return;
     }
@@ -163,9 +159,9 @@ export function InternetIdentityProvider({
     void client
       .logout()
       .then(() => {
-        setIdentity(undefined);
         authClientRef.current = undefined;
         initDoneRef.current = false;
+        setIdentity(undefined);
         setStatus("idle");
         setError(undefined);
       })
@@ -179,43 +175,34 @@ export function InternetIdentityProvider({
       });
   }, [setErrorMessage]);
 
-  // CRITICAL: Empty dependency array [] ensures this runs EXACTLY ONCE on mount.
-  // Never add authClient, createOptions, or any state here -- that causes infinite loops.
+  // Empty dependency array -- runs exactly ONCE on mount, never again
   useEffect(() => {
-    // Double-guard: prevent any chance of double initialization
     if (initDoneRef.current) return;
     initDoneRef.current = true;
 
-    let cancelled = false;
     void (async () => {
       try {
         setStatus("initializing");
         const client = await createAuthClient(createOptionsRef.current);
-        if (cancelled) return;
         authClientRef.current = client;
         const isAuthenticated = await client.isAuthenticated();
-        if (cancelled) return;
         if (isAuthenticated) {
           const loadedIdentity = client.getIdentity();
           setIdentity(loadedIdentity);
         }
       } catch (unknownError) {
-        if (!cancelled) {
-          setStatus("loginError");
-          setError(
-            unknownError instanceof Error
-              ? unknownError
-              : new Error("Initialization failed"),
-          );
-        }
+        setStatus("loginError");
+        setError(
+          unknownError instanceof Error
+            ? unknownError
+            : new Error("Initialization failed"),
+        );
       } finally {
-        if (!cancelled) setStatus("idle");
+        setStatus("idle");
       }
     })();
-    return () => {
-      cancelled = true;
-    };
-  }, []); // Empty deps: runs once on mount only
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const value = useMemo<ProviderValue>(
     () => ({

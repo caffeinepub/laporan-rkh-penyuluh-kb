@@ -3,15 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { HttpAgent } from "@icp-sdk/core/agent";
-import {
-  FileText,
-  Image,
-  Loader2,
-  Paperclip,
-  Plus,
-  Upload,
-  X,
-} from "lucide-react";
+import { FileText, Image, Loader2, X } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import type { RKHReport } from "../backend.d";
@@ -22,20 +14,9 @@ import type { Page } from "../types";
 import { StorageClient } from "../utils/StorageClient";
 import { compressFile } from "../utils/compressFile";
 
-const MIN_ATTACHMENTS = 2;
-const MAX_ATTACHMENTS = 5;
-
 interface InputRKHPageProps {
   onNavigate: (page: Page) => void;
   editReport?: RKHReport | null;
-}
-
-function getFileIcon(file: File) {
-  if (file.type.startsWith("image/"))
-    return <Image size={18} className="text-blue-500" />;
-  if (file.type === "application/pdf")
-    return <FileText size={18} className="text-red-500" />;
-  return <Paperclip size={18} className="text-gray-500" />;
 }
 
 function formatFileSize(bytes: number): string {
@@ -52,7 +33,6 @@ export default function InputRKHPage({
   const createMutation = useCreateRKHReport();
   const updateMutation = useUpdateReport();
   const { identity } = useInternetIdentity();
-  // Store identity in ref so it's always up-to-date during async upload
   const identityRef = useRef(identity);
   identityRef.current = identity;
 
@@ -80,11 +60,16 @@ export default function InputRKHPage({
     };
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
+
+  // Two separate file slots: dokumen (PDF) and gambar (image)
+  const [dokumenFile, setDokumenFile] = useState<File | null>(null);
+  const [gambarFile, setGambarFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<number[]>([]);
-  const [compressedSizes, setCompressedSizes] = useState<number[]>([]);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [dokumenProgress, setDokumenProgress] = useState(0);
+  const [gambarProgress, setGambarProgress] = useState(0);
+
+  const dokumenRef = useRef<HTMLInputElement>(null);
+  const gambarRef = useRef<HTMLInputElement>(null);
 
   const validate = () => {
     const e: Record<string, string> = {};
@@ -96,36 +81,40 @@ export default function InputRKHPage({
     if (!form.lokasi.trim()) e.lokasi = "Lokasi wajib diisi";
     if (!form.hasilKegiatan.trim())
       e.hasilKegiatan = "Hasil kegiatan wajib diisi";
-    if (attachedFiles.length > MAX_ATTACHMENTS)
-      e.lampiran = `Lampiran maksimal ${MAX_ATTACHMENTS} file.`;
-    else if (attachedFiles.length > 0 && attachedFiles.length < MIN_ATTACHMENTS)
-      e.lampiran = `Lampiran minimal ${MIN_ATTACHMENTS} file. Saat ini baru ${attachedFiles.length} file.`;
     return e;
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const rawFiles = Array.from(e.target.files ?? []);
-    if (rawFiles.length === 0) return;
-
-    const compressed = await Promise.all(rawFiles.map(compressFile));
-    setAttachedFiles((prev) => {
-      const merged = [...prev, ...compressed].slice(0, MAX_ATTACHMENTS);
-      setCompressedSizes(merged.map((f) => f.size));
-      return merged;
-    });
-    if (fileInputRef.current) fileInputRef.current.value = "";
+  const handleDokumenChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) setDokumenFile(file);
+    if (dokumenRef.current) dokumenRef.current.value = "";
   };
 
-  const handleRemoveFile = (index: number) => {
-    setAttachedFiles((prev) => prev.filter((_, i) => i !== index));
-    setUploadProgress((prev) => prev.filter((_, i) => i !== index));
-    setCompressedSizes((prev) => prev.filter((_, i) => i !== index));
+  const handleGambarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const compressed = await compressFile(file);
+      setGambarFile(compressed);
+    }
+    if (gambarRef.current) gambarRef.current.value = "";
+  };
+
+  const uploadSingleFile = async (
+    file: File,
+    storageClient: StorageClient,
+    onProgress: (p: number) => void,
+  ): Promise<{ name: string; url: string }> => {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const { hash } = await storageClient.putFile(bytes, onProgress);
+    const url = await storageClient.getDirectURL(hash);
+    return { name: file.name, url };
   };
 
   const uploadAttachments = async (): Promise<string | undefined> => {
-    if (attachedFiles.length === 0) return undefined;
+    if (!dokumenFile && !gambarFile) return undefined;
     setIsUploading(true);
-    setUploadProgress(new Array(attachedFiles.length).fill(0));
+    setDokumenProgress(0);
+    setGambarProgress(0);
     try {
       const config = await loadConfig();
       const currentIdentity = identityRef.current;
@@ -145,19 +134,29 @@ export default function InputRKHPage({
       );
 
       const results: { name: string; url: string }[] = [];
-      for (let i = 0; i < attachedFiles.length; i++) {
-        const file = attachedFiles[i];
-        const bytes = new Uint8Array(await file.arrayBuffer());
-        const { hash } = await storageClient.putFile(bytes, (progress) => {
-          setUploadProgress((prev) => {
-            const updated = [...prev];
-            updated[i] = progress;
-            return updated;
-          });
+
+      if (dokumenFile) {
+        const result = await uploadSingleFile(dokumenFile, storageClient, (p) =>
+          setDokumenProgress(p),
+        );
+        results.push({ ...result, type: "dokumen" } as {
+          name: string;
+          url: string;
+          type: string;
         });
-        const url = await storageClient.getDirectURL(hash);
-        results.push({ name: file.name, url });
       }
+
+      if (gambarFile) {
+        const result = await uploadSingleFile(gambarFile, storageClient, (p) =>
+          setGambarProgress(p),
+        );
+        results.push({ ...result, type: "gambar" } as {
+          name: string;
+          url: string;
+          type: string;
+        });
+      }
+
       return JSON.stringify(results);
     } finally {
       setIsUploading(false);
@@ -184,7 +183,6 @@ export default function InputRKHPage({
 
     try {
       if (isEditing && editReport) {
-        // Build the full RKHReport for the backend update
         const updatedReport: RKHReport = {
           ...editReport,
           tanggal: form.tanggal,
@@ -220,8 +218,6 @@ export default function InputRKHPage({
 
   const isPending =
     createMutation.isPending || updateMutation.isPending || isUploading;
-
-  const remaining = Math.max(0, MIN_ATTACHMENTS - attachedFiles.length);
 
   return (
     <div className="bg-white rounded-lg shadow-card">
@@ -400,141 +396,143 @@ export default function InputRKHPage({
           />
         </div>
 
-        {/* Lampiran / Attachment */}
-        <div>
-          <div className="flex items-center justify-between mb-1">
-            <Label className="text-sm font-medium text-brand-nav">
-              Lampiran{" "}
-              <span className="text-gray-400 text-xs font-normal">
-                (opsional, minimal {MIN_ATTACHMENTS} file jika diisi)
-              </span>
-            </Label>
-            {attachedFiles.length > 0 && (
-              <span
-                className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                  attachedFiles.length >= MIN_ATTACHMENTS
-                    ? "bg-green-100 text-green-700"
-                    : "bg-amber-100 text-amber-700"
-                }`}
-              >
-                {attachedFiles.length}/{MIN_ATTACHMENTS} file
-              </span>
-            )}
-          </div>
-          <p className="text-xs text-gray-400 mb-2">
-            Unggah minimal {MIN_ATTACHMENTS} file pendukung: gambar, PDF, Word,
-            atau format lainnya. Gambar akan dikecilkan otomatis.
-          </p>
+        {/* Lampiran -- Dokumen & Gambar terpisah, masing-masing 1 file */}
+        <div className="space-y-4">
+          <Label className="text-sm font-medium text-brand-nav">
+            Lampiran{" "}
+            <span className="text-gray-400 text-xs font-normal">
+              (opsional)
+            </span>
+          </Label>
 
-          {attachedFiles.length > 0 && (
-            <div className="space-y-2 mb-3">
-              {attachedFiles.map((file, index) => (
-                <div
-                  key={`${file.name}-${index}`}
-                  className="border border-gray-200 rounded-lg p-2.5 flex items-center gap-3 bg-gray-50"
-                >
-                  <div className="shrink-0">{getFileIcon(file)}</div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-700 truncate">
-                      {file.name}
-                    </p>
-                    <p className="text-xs text-gray-400">
-                      {formatFileSize(compressedSizes[index] ?? file.size)}
-                      {file.type.startsWith("image/") && (
-                        <span className="ml-1 text-green-500">(dikompres)</span>
-                      )}
-                    </p>
-                    {isUploading && uploadProgress[index] !== undefined && (
-                      <div className="mt-1.5">
-                        <div className="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-green-500 rounded-full transition-all"
-                            style={{ width: `${uploadProgress[index]}%` }}
-                          />
-                        </div>
-                        <p className="text-xs text-gray-400 mt-0.5">
-                          {uploadProgress[index]}%
-                        </p>
+          {/* Upload Dokumen (PDF) */}
+          <div className="border border-gray-200 rounded-lg p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <FileText size={16} className="text-red-500" />
+              <span className="text-sm font-medium text-gray-700">
+                Dokumen / PDF
+              </span>
+              <span className="text-xs text-gray-400">(maks. 1 file)</span>
+            </div>
+            {dokumenFile ? (
+              <div className="flex items-center gap-3 bg-gray-50 rounded-md px-3 py-2">
+                <FileText size={16} className="text-red-500 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-gray-700 truncate">
+                    {dokumenFile.name}
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    {formatFileSize(dokumenFile.size)}
+                  </p>
+                  {isUploading && dokumenProgress > 0 && (
+                    <div className="mt-1">
+                      <div className="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-green-500 rounded-full transition-all"
+                          style={{ width: `${dokumenProgress}%` }}
+                        />
                       </div>
-                    )}
-                  </div>
-                  {!isUploading && (
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveFile(index)}
-                      className="shrink-0 p-1 rounded hover:bg-gray-200 text-gray-400 hover:text-red-500 transition-colors"
-                      title="Hapus lampiran"
-                    >
-                      <X size={16} />
-                    </button>
+                    </div>
                   )}
                 </div>
-              ))}
-            </div>
-          )}
-
-          {attachedFiles.length > 0 &&
-            attachedFiles.length < MIN_ATTACHMENTS && (
-              <div className="flex items-center gap-2 mb-3">
-                {[1, 2].map((step) => (
-                  <div
-                    key={step}
-                    className={`h-1.5 flex-1 rounded-full transition-all ${
-                      step - 1 < attachedFiles.length
-                        ? "bg-green-500"
-                        : "bg-gray-200"
-                    }`}
-                  />
-                ))}
-                <span className="text-xs text-amber-600 whitespace-nowrap">
-                  +{remaining} lagi
-                </span>
+                {!isUploading && (
+                  <button
+                    type="button"
+                    onClick={() => setDokumenFile(null)}
+                    className="shrink-0 p-1 rounded hover:bg-gray-200 text-gray-400 hover:text-red-500 transition-colors"
+                    title="Hapus"
+                  >
+                    <X size={15} />
+                  </button>
+                )}
               </div>
+            ) : (
+              <label
+                htmlFor="lampiran-dokumen"
+                className="flex items-center gap-3 border border-dashed border-gray-300 rounded-md px-3 py-2.5 cursor-pointer hover:border-green-400 hover:bg-green-50/30 transition-colors"
+              >
+                <FileText size={16} className="text-gray-400" />
+                <span className="text-sm text-gray-500">
+                  Pilih file PDF atau dokumen
+                </span>
+                <input
+                  ref={dokumenRef}
+                  id="lampiran-dokumen"
+                  type="file"
+                  accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  className="hidden"
+                  onChange={handleDokumenChange}
+                  disabled={isUploading}
+                />
+              </label>
             )}
+          </div>
 
-          {!isUploading && (
-            <label
-              htmlFor="lampiran-file"
-              className="border-2 border-dashed border-gray-200 rounded-lg p-4 text-center cursor-pointer hover:border-green-400 hover:bg-green-50/40 transition-colors block"
-            >
-              {attachedFiles.length === 0 ? (
-                <>
-                  <Upload size={22} className="mx-auto mb-2 text-gray-400" />
-                  <p className="text-sm text-gray-500">
-                    Klik untuk memilih file
+          {/* Upload Gambar */}
+          <div className="border border-gray-200 rounded-lg p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <Image size={16} className="text-blue-500" />
+              <span className="text-sm font-medium text-gray-700">
+                Gambar / Foto
+              </span>
+              <span className="text-xs text-gray-400">
+                (maks. 1 file, otomatis dikecilkan)
+              </span>
+            </div>
+            {gambarFile ? (
+              <div className="flex items-center gap-3 bg-gray-50 rounded-md px-3 py-2">
+                <Image size={16} className="text-blue-500 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-gray-700 truncate">
+                    {gambarFile.name}
                   </p>
-                  <p className="text-xs text-gray-400 mt-1">
-                    Tambahkan minimal {MIN_ATTACHMENTS} file (gambar, PDF, Word,
-                    dll)
+                  <p className="text-xs text-gray-400">
+                    {formatFileSize(gambarFile.size)}
+                    <span className="ml-1 text-green-500">(dikompres)</span>
                   </p>
-                </>
-              ) : (
-                <div className="flex items-center justify-center gap-2 text-green-600">
-                  <Plus size={16} />
-                  <span className="text-sm font-medium">Tambah file lagi</span>
+                  {isUploading && gambarProgress > 0 && (
+                    <div className="mt-1">
+                      <div className="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-blue-500 rounded-full transition-all"
+                          style={{ width: `${gambarProgress}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
-              <input
-                ref={fileInputRef}
-                id="lampiran-file"
-                type="file"
-                accept="*/*"
-                multiple
-                className="hidden"
-                onChange={handleFileChange}
-              />
-            </label>
-          )}
-
-          {errors.lampiran && (
-            <p className="text-xs text-red-500 mt-1">{errors.lampiran}</p>
-          )}
-
-          {attachedFiles.length >= MIN_ATTACHMENTS && (
-            <p className="text-xs text-green-600 mt-1.5 flex items-center gap-1">
-              <span>&#10003;</span> {attachedFiles.length} file siap diunggah
-            </p>
-          )}
+                {!isUploading && (
+                  <button
+                    type="button"
+                    onClick={() => setGambarFile(null)}
+                    className="shrink-0 p-1 rounded hover:bg-gray-200 text-gray-400 hover:text-red-500 transition-colors"
+                    title="Hapus"
+                  >
+                    <X size={15} />
+                  </button>
+                )}
+              </div>
+            ) : (
+              <label
+                htmlFor="lampiran-gambar"
+                className="flex items-center gap-3 border border-dashed border-gray-300 rounded-md px-3 py-2.5 cursor-pointer hover:border-blue-400 hover:bg-blue-50/30 transition-colors"
+              >
+                <Image size={16} className="text-gray-400" />
+                <span className="text-sm text-gray-500">
+                  Pilih file gambar / foto
+                </span>
+                <input
+                  ref={gambarRef}
+                  id="lampiran-gambar"
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleGambarChange}
+                  disabled={isUploading}
+                />
+              </label>
+            )}
+          </div>
         </div>
 
         <div className="flex gap-3 pt-2">

@@ -1,23 +1,21 @@
 # Laporan RKH Penyuluh KB
 
 ## Current State
-App loads slowly due to multiple initialization cycles in `useInternetIdentity` and excessive query refetching in `useActor`.
+App has persistent upload error (403 Forbidden: Invalid payload) and loading/flicker issues. Root cause: `useInternetIdentity.ts` uses `useState` for `authClient` and includes `[createOptions, authClient]` in `useEffect` dependency array, causing infinite re-initialization loop that resets identity during uploads.
 
 ## Requested Changes (Diff)
 
 ### Add
-- `useRef`-based single-run initialization guard in `useInternetIdentity`
-- Default QueryClient options: `refetchOnWindowFocus: false`, `refetchOnReconnect: false`, `staleTime: 5min`
+- `initDoneRef` guard in `useInternetIdentity` to prevent any re-run
 
 ### Modify
-- `useInternetIdentity`: Remove `authClient` from `useEffect` dependency array; use `useRef` to store client so effect only runs once on mount
-- `useActor`: Remove `useQueryClient` + `useEffect` block that invalidated/refetched all queries on actor change (was causing cascading backend calls)
-- `main.tsx`: Add QueryClient defaultOptions to reduce unnecessary refetches
+- `useInternetIdentity.ts`: Move `authClient` from `useState` to `useRef` (no re-render), store `createOptions` in `useRef`, change `useEffect` dependency to `[]` (empty), remove `authClient` and `createOptions` from callbacks.
 
 ### Remove
-- N/A
+- `authClient` state variable (replaced by `authClientRef`)
+- `[createOptions, authClient]` dependencies from `useEffect`
 
 ## Implementation Plan
-1. Fix `useInternetIdentity` to initialize AuthClient only once using `useRef`
-2. Simplify `useActor` to remove aggressive query invalidation
-3. Configure QueryClient with conservative default staleTime and disable focus/reconnect refetching
+1. Rewrite `useInternetIdentity.ts` with `authClientRef` (useRef), `createOptionsRef` (useRef), `initDoneRef` guard, empty dependency `useEffect`.
+2. Update all internal callbacks to use `authClientRef.current` instead of `authClient` state.
+3. Validate and deploy.
