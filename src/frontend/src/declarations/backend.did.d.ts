@@ -92,6 +92,7 @@ export interface _SERVICE {
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
   'setUserRole' : ActorMethod<[Principal, UserRole], undefined>,
   'setUserToken' : ActorMethod<[Principal, string], undefined>,
+  'deleteReport' : ActorMethod<[bigint], undefined>,
   'updateReport' : ActorMethod<[Array<RKHReport>], undefined>,
   'validateUserToken' : ActorMethod<[string], boolean>,
 }

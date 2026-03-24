@@ -111,6 +111,7 @@ export const idlService = IDL.Service({
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
   'setUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
   'setUserToken' : IDL.Func([IDL.Principal, IDL.Text], [], []),
+  'deleteReport' : IDL.Func([IDL.Nat], [], []),
   'updateReport' : IDL.Func([IDL.Vec(RKHReport)], [], []),
   'validateUserToken' : IDL.Func([IDL.Text], [IDL.Bool], ['query']),
 });
@@ -225,7 +226,8 @@ export const idlFactory = ({ IDL }) => {
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
     'setUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
     'setUserToken' : IDL.Func([IDL.Principal, IDL.Text], [], []),
-    'updateReport' : IDL.Func([IDL.Vec(RKHReport)], [], []),
+    'deleteReport' : IDL.Func([IDL.Nat], [], []),
+  'updateReport' : IDL.Func([IDL.Vec(RKHReport)], [], []),
     'validateUserToken' : IDL.Func([IDL.Text], [IDL.Bool], ['query']),
   });
 };

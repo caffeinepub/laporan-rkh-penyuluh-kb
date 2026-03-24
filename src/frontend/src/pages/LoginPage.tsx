@@ -1,16 +1,29 @@
 import { Loader2 } from "lucide-react";
+import { useState } from "react";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
+
+const LOGO_PATH = "/assets/uploads/logo-bkkbn-1.jpg";
 
 export default function LoginPage() {
   const { login, loginStatus } = useInternetIdentity();
   const isLoggingIn = loginStatus === "logging-in";
+  const [logoError, setLogoError] = useState(false);
 
   return (
     <div className="min-h-screen bg-brand-bg flex flex-col">
       <div className="bg-white border-b border-brand-border px-6 py-3 flex items-center gap-4">
-        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-gradStart to-brand-gradEnd flex items-center justify-center">
-          <span className="text-white font-bold text-xs">BKKBN</span>
-        </div>
+        {!logoError ? (
+          <img
+            src={LOGO_PATH}
+            alt="Logo BKKBN"
+            className="h-10 w-auto object-contain"
+            onError={() => setLogoError(true)}
+          />
+        ) : (
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-gradStart to-brand-gradEnd flex items-center justify-center">
+            <span className="text-white font-bold text-xs">BKKBN</span>
+          </div>
+        )}
         <h1 className="text-sm font-bold text-brand-nav uppercase tracking-wide">
           Sistem Laporan RKH Penyuluh KB
         </h1>
@@ -19,14 +32,24 @@ export default function LoginPage() {
       <div className="flex-1 flex items-center justify-center px-4 py-12">
         <div className="bg-white rounded-xl shadow-card w-full max-w-md p-8">
           <div className="flex justify-center mb-6">
-            <div
-              className="w-20 h-20 rounded-full flex items-center justify-center"
-              style={{
-                background: "linear-gradient(135deg, #1F8A63 0%, #2AA08A 100%)",
-              }}
-            >
-              <span className="text-white font-bold text-lg">RKH</span>
-            </div>
+            {!logoError ? (
+              <img
+                src={LOGO_PATH}
+                alt="Logo BKKBN"
+                className="h-24 w-auto object-contain"
+                onError={() => setLogoError(true)}
+              />
+            ) : (
+              <div
+                className="w-20 h-20 rounded-full flex items-center justify-center"
+                style={{
+                  background:
+                    "linear-gradient(135deg, #1F8A63 0%, #2AA08A 100%)",
+                }}
+              >
+                <span className="text-white font-bold text-lg">RKH</span>
+              </div>
+            )}
           </div>
 
           <h2 className="text-xl font-bold text-brand-nav text-center mb-1">

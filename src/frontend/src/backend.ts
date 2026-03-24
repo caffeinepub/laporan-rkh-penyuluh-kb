@@ -157,6 +157,7 @@ export interface backendInterface {
     queryReportsYearly(filterYear: string): Promise<Array<RKHReport>>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     setUserRole(user: Principal, newRole: UserRole): Promise<void>;
+    deleteReport(reportId: bigint): Promise<void>;
     updateReport(reports: Array<RKHReport>): Promise<void>;
 }
 import type { RKHReport as _RKHReport, UserProfile as _UserProfile, UserRole as _UserRole } from "./declarations/backend.did.d.ts";
@@ -471,6 +472,10 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async deleteReport(arg0: bigint): Promise<void> {
+        return this.actor.deleteReport(arg0);
+    }
+
     async updateReport(arg0: Array<RKHReport>): Promise<void> {
         if (this.processError) {
             try {

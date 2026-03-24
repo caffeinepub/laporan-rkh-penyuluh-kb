@@ -20,6 +20,7 @@ import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import { useCreateRKHReport, useUpdateReport } from "../hooks/useQueries";
 import type { Page } from "../types";
 import { StorageClient } from "../utils/StorageClient";
+import { compressFile } from "../utils/compressFile";
 
 const MIN_ATTACHMENTS = 2;
 const MAX_ATTACHMENTS = 5;
@@ -82,6 +83,7 @@ export default function InputRKHPage({
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number[]>([]);
+  const [compressedSizes, setCompressedSizes] = useState<number[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const validate = () => {
@@ -101,19 +103,23 @@ export default function InputRKHPage({
     return e;
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? []);
-    if (files.length > 0) {
-      setAttachedFiles((prev) => {
-        return [...prev, ...files].slice(0, MAX_ATTACHMENTS);
-      });
-    }
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawFiles = Array.from(e.target.files ?? []);
+    if (rawFiles.length === 0) return;
+
+    const compressed = await Promise.all(rawFiles.map(compressFile));
+    setAttachedFiles((prev) => {
+      const merged = [...prev, ...compressed].slice(0, MAX_ATTACHMENTS);
+      setCompressedSizes(merged.map((f) => f.size));
+      return merged;
+    });
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleRemoveFile = (index: number) => {
     setAttachedFiles((prev) => prev.filter((_, i) => i !== index));
     setUploadProgress((prev) => prev.filter((_, i) => i !== index));
+    setCompressedSizes((prev) => prev.filter((_, i) => i !== index));
   };
 
   const uploadAttachments = async (): Promise<string | undefined> => {
@@ -122,7 +128,6 @@ export default function InputRKHPage({
     setUploadProgress(new Array(attachedFiles.length).fill(0));
     try {
       const config = await loadConfig();
-      // Use identityRef.current to always get latest identity
       const currentIdentity = identityRef.current;
       if (!currentIdentity) {
         throw new Error("Sesi login tidak ditemukan. Silakan login ulang.");
@@ -177,21 +182,33 @@ export default function InputRKHPage({
       return;
     }
 
-    const data = {
-      tanggal: form.tanggal,
-      kegiatan: form.kegiatan,
-      sasaran: form.sasaran,
-      jumlahSasaran: BigInt(form.jumlahSasaran),
-      lokasi: form.lokasi,
-      hasilKegiatan: form.hasilKegiatan,
-      keterangan: form.keterangan || undefined,
-      lampiran: lampiranValue,
-    };
     try {
       if (isEditing && editReport) {
-        await updateMutation.mutateAsync({ id: editReport.id, data });
+        // Build the full RKHReport for the backend update
+        const updatedReport: RKHReport = {
+          ...editReport,
+          tanggal: form.tanggal,
+          kegiatan: form.kegiatan,
+          sasaran: form.sasaran,
+          jumlahSasaran: BigInt(form.jumlahSasaran),
+          lokasi: form.lokasi,
+          hasilKegiatan: form.hasilKegiatan,
+          keterangan: form.keterangan || undefined,
+          lampiran: lampiranValue ?? editReport.lampiran,
+        };
+        await updateMutation.mutateAsync(updatedReport);
         toast.success("Laporan berhasil diperbarui!");
       } else {
+        const data = {
+          tanggal: form.tanggal,
+          kegiatan: form.kegiatan,
+          sasaran: form.sasaran,
+          jumlahSasaran: BigInt(form.jumlahSasaran),
+          lokasi: form.lokasi,
+          hasilKegiatan: form.hasilKegiatan,
+          keterangan: form.keterangan || undefined,
+          lampiran: lampiranValue,
+        };
         await createMutation.mutateAsync(data);
         toast.success("Laporan RKH berhasil disimpan!");
       }
@@ -241,12 +258,7 @@ export default function InputRKHPage({
             }
           />
           {errors.tanggal && (
-            <p
-              data-ocid="rkh_form.tanggal.error_state"
-              className="text-xs text-red-500 mt-1"
-            >
-              {errors.tanggal}
-            </p>
+            <p className="text-xs text-red-500 mt-1">{errors.tanggal}</p>
           )}
         </div>
 
@@ -269,12 +281,7 @@ export default function InputRKHPage({
             }
           />
           {errors.kegiatan && (
-            <p
-              data-ocid="rkh_form.kegiatan.error_state"
-              className="text-xs text-red-500 mt-1"
-            >
-              {errors.kegiatan}
-            </p>
+            <p className="text-xs text-red-500 mt-1">{errors.kegiatan}</p>
           )}
         </div>
 
@@ -297,12 +304,7 @@ export default function InputRKHPage({
               }
             />
             {errors.sasaran && (
-              <p
-                data-ocid="rkh_form.sasaran.error_state"
-                className="text-xs text-red-500 mt-1"
-              >
-                {errors.sasaran}
-              </p>
+              <p className="text-xs text-red-500 mt-1">{errors.sasaran}</p>
             )}
           </div>
           <div>
@@ -325,10 +327,7 @@ export default function InputRKHPage({
               }
             />
             {errors.jumlahSasaran && (
-              <p
-                data-ocid="rkh_form.jumlah_sasaran.error_state"
-                className="text-xs text-red-500 mt-1"
-              >
+              <p className="text-xs text-red-500 mt-1">
                 {errors.jumlahSasaran}
               </p>
             )}
@@ -351,12 +350,7 @@ export default function InputRKHPage({
             onChange={(e) => setForm((f) => ({ ...f, lokasi: e.target.value }))}
           />
           {errors.lokasi && (
-            <p
-              data-ocid="rkh_form.lokasi.error_state"
-              className="text-xs text-red-500 mt-1"
-            >
-              {errors.lokasi}
-            </p>
+            <p className="text-xs text-red-500 mt-1">{errors.lokasi}</p>
           )}
         </div>
 
@@ -379,12 +373,7 @@ export default function InputRKHPage({
             }
           />
           {errors.hasilKegiatan && (
-            <p
-              data-ocid="rkh_form.hasil_kegiatan.error_state"
-              className="text-xs text-red-500 mt-1"
-            >
-              {errors.hasilKegiatan}
-            </p>
+            <p className="text-xs text-red-500 mt-1">{errors.hasilKegiatan}</p>
           )}
         </div>
 
@@ -434,10 +423,9 @@ export default function InputRKHPage({
           </div>
           <p className="text-xs text-gray-400 mb-2">
             Unggah minimal {MIN_ATTACHMENTS} file pendukung: gambar, PDF, Word,
-            atau format lainnya
+            atau format lainnya. Gambar akan dikecilkan otomatis.
           </p>
 
-          {/* File list */}
           {attachedFiles.length > 0 && (
             <div className="space-y-2 mb-3">
               {attachedFiles.map((file, index) => (
@@ -451,7 +439,10 @@ export default function InputRKHPage({
                       {file.name}
                     </p>
                     <p className="text-xs text-gray-400">
-                      {formatFileSize(file.size)}
+                      {formatFileSize(compressedSizes[index] ?? file.size)}
+                      {file.type.startsWith("image/") && (
+                        <span className="ml-1 text-green-500">(dikompres)</span>
+                      )}
                     </p>
                     {isUploading && uploadProgress[index] !== undefined && (
                       <div className="mt-1.5">
@@ -482,7 +473,6 @@ export default function InputRKHPage({
             </div>
           )}
 
-          {/* Progress indicator */}
           {attachedFiles.length > 0 &&
             attachedFiles.length < MIN_ATTACHMENTS && (
               <div className="flex items-center gap-2 mb-3">
@@ -502,7 +492,6 @@ export default function InputRKHPage({
               </div>
             )}
 
-          {/* Add file button / drop zone */}
           {!isUploading && (
             <label
               htmlFor="lampiran-file"

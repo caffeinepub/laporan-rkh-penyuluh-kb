@@ -324,7 +324,7 @@ export default function RiwayatLaporanPage({
             }}
           >
             <img
-              src="/assets/uploads/Logo_Kementerian_Kependudukan_dan_Pembangunan_Keluarga_-_BKKBN_-2024-.svg-1.png"
+              src="/assets/uploads/logo-bkkbn-1.jpg"
               alt="Logo BKKBN"
               style={{ width: "80px", height: "80px", objectFit: "contain" }}
             />

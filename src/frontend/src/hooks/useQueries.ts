@@ -77,17 +77,14 @@ export function useQueryRKHReports(filter: {
       if (!actor) return [];
 
       let bulanFilter: string | null = null;
-      let tahunFilter: string | null = null;
+      const tahunFilter: string | null = null;
 
       if (filter.bulan && filter.tahun) {
         bulanFilter = `${filter.tahun}-${filter.bulan}`;
-        tahunFilter = null;
       } else if (filter.bulan) {
         bulanFilter = filter.bulan;
-        tahunFilter = null;
       } else if (filter.tahun) {
         bulanFilter = filter.tahun;
-        tahunFilter = null;
       }
 
       return actor.queryReports(
@@ -142,24 +139,10 @@ export function useUpdateReport() {
   const { actor } = useActor();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({
-      id: _id,
-      data,
-    }: {
-      id: bigint;
-      data: {
-        hasilKegiatan: string;
-        kegiatan: string;
-        tanggal: string;
-        lokasi: string;
-        keterangan?: string;
-        lampiran?: string;
-        jumlahSasaran: bigint;
-        sasaran: string;
-      };
-    }) => {
+    // Pass the full RKHReport so backend gets all required fields
+    mutationFn: async (report: RKHReport) => {
       if (!actor) throw new Error("Actor not available");
-      return actor.updateReport([data as unknown as RKHReport]);
+      return actor.updateReport([report]);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["myReports"] });
@@ -173,9 +156,9 @@ export function useDeleteReport() {
   const { actor } = useActor();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (_id: bigint) => {
+    mutationFn: async (reportId: bigint) => {
       if (!actor) throw new Error("Actor not available");
-      // deleteReport not in generated interface; no-op for now
+      await actor.deleteReport(reportId);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["myReports"] });

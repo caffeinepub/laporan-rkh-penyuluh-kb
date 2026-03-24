@@ -55,6 +55,7 @@ export interface backendInterface {
         jumlahSasaran: bigint;
         sasaran: string;
     }): Promise<RKHReport>;
+    deleteReport(reportId: bigint): Promise<void>;
     filterReportsByUser(user: Principal): Promise<Array<RKHReport>>;
     filterReportsByUserAndMonth(user: Principal, month: string): Promise<Array<RKHReport>>;
     filterReportsByUserAndMonthYear(user: Principal, month: string, year: string): Promise<Array<RKHReport>>;

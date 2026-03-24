@@ -24,7 +24,7 @@ actor {
     tandaTangan : ?Text;
   };
 
-  // Internal stored type — must NOT change to stay compatible with existing stable data
+  // Internal stored type
   type RKHReportStored = {
     id : Nat;
     user : Principal;
@@ -38,7 +38,7 @@ actor {
     createdAt : Int;
   };
 
-  // Public API type — includes lampiran merged from separate stable map
+  // Public API type
   type RKHReport = {
     id : Nat;
     user : Principal;
@@ -64,9 +64,7 @@ actor {
   };
 
   var nextReportId = 1;
-  // Original stable var — type unchanged for upgrade compatibility
   let rkhReports = Map.empty<Nat, RKHReportStored>();
-  // Separate stable var for attachments (new — no compatibility issue)
   let rkhLampiran = Map.empty<Nat, Text>();
   let userProfiles = Map.empty<Principal, UserProfile>();
   let userTokens = Map.empty<Principal, Text>();
@@ -74,7 +72,6 @@ actor {
   let accessControlState = AccessControl.initState();
   include MixinAuthorization(accessControlState);
 
-  // Merge stored report with its lampiran
   func withLampiran(r : RKHReportStored) : RKHReport {
     {
       id = r.id;
@@ -307,7 +304,7 @@ actor {
       switch (rkhReports.get(report.id)) {
         case (null) { Runtime.trap("Report not found") };
         case (?existing) {
-          if (not (existing.user == caller)) {
+          if (not AccessControl.isAdmin(accessControlState, caller) and not (existing.user == caller)) {
             Runtime.trap("Unauthorized: Cannot update reports for other users");
           };
         };
@@ -331,6 +328,20 @@ actor {
       switch (r.lampiran) {
         case (null) {};
         case (?lmp) { rkhLampiran.add(r.id, lmp) };
+      };
+    };
+  };
+
+  // Delete a report by id — only the owner or admin can delete
+  public shared ({ caller }) func deleteReport(reportId : Nat) : async () {
+    switch (rkhReports.get(reportId)) {
+      case (null) { Runtime.trap("Report not found") };
+      case (?existing) {
+        if (not AccessControl.isAdmin(accessControlState, caller) and not (existing.user == caller)) {
+          Runtime.trap("Unauthorized: Cannot delete reports for other users");
+        };
+        ignore rkhReports.remove(reportId);
+        ignore rkhLampiran.remove(reportId);
       };
     };
   };

@@ -35,8 +35,8 @@ const navItems: { page: Page; label: string; icon: React.ReactNode }[] = [
   { page: "profil", label: "Profil", icon: <User size={15} /> },
 ];
 
-const LOGO_PATH =
-  "/assets/uploads/Logo_Kementerian_Kependudukan_dan_Pembangunan_Keluarga_-_BKKBN_-2024-.svg-1.png";
+// Updated logo path to use the new uploaded BKKBN logo
+const LOGO_PATH = "/assets/uploads/logo-bkkbn-1.jpg";
 
 export default function Header({
   currentPage,
@@ -76,12 +76,12 @@ export default function Header({
             <img
               src={LOGO_PATH}
               alt="Logo BKKBN"
-              className="h-12 w-auto object-contain"
+              className="h-14 w-auto object-contain"
               onError={() => setLogoError(true)}
             />
           ) : (
             <div
-              className="h-12 w-12 rounded-full flex items-center justify-center text-white font-bold text-sm"
+              className="h-12 px-3 rounded-lg flex items-center justify-center text-white font-bold text-sm"
               style={{
                 background: "linear-gradient(135deg, #1F8A63 0%, #2AA08A 100%)",
               }}
