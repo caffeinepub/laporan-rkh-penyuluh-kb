@@ -14,13 +14,18 @@ declare global {
   }
 }
 
+// Configure QueryClient to avoid unnecessary refetches
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: 1,
+      // Do not refetch when window regains focus
       refetchOnWindowFocus: false,
+      // Do not refetch on network reconnect
       refetchOnReconnect: false,
-      staleTime: 5 * 60 * 1000, // 5 minutes default
+      // Do not retry failed requests automatically
+      retry: 1,
+      // Keep data fresh for 5 minutes
+      staleTime: 5 * 60 * 1000,
     },
   },
 });
