@@ -17,6 +17,7 @@ const InputRKHPage = lazy(() => import("./pages/InputRKHPage"));
 const RiwayatLaporanPage = lazy(() => import("./pages/RiwayatLaporanPage"));
 const ProfilPage = lazy(() => import("./pages/ProfilPage"));
 const AdminPage = lazy(() => import("./pages/AdminPage"));
+const UploadLampiranPage = lazy(() => import("./pages/UploadLampiranPage"));
 
 function PageLoader() {
   return (
@@ -108,6 +109,8 @@ export default function App() {
         );
       case "profil":
         return <ProfilPage />;
+      case "upload-lampiran":
+        return <UploadLampiranPage onNavigate={handleNavigate} />;
       case "admin":
         return isAdmin ? (
           <AdminPage />

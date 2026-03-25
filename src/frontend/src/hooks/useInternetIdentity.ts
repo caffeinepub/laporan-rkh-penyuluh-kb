@@ -69,9 +69,7 @@ function assertProviderPresent(
   context: ProviderValue | undefined,
 ): asserts context is ProviderValue {
   if (!context) {
-    throw new Error(
-      "InternetIdentityProvider is not present. Wrap your component tree with it.",
-    );
+    throw new Error("InternetIdentityProvider is not present.");
   }
 }
 
@@ -88,10 +86,12 @@ export function InternetIdentityProvider({
   children: ReactNode;
   createOptions?: AuthClientCreateOptions;
 }>) {
-  // Store authClient and createOptions in refs -- NEVER as state dependencies
+  // authClient stored in ref — never causes re-render
   const authClientRef = useRef<AuthClient | undefined>(undefined);
-  const createOptionsRef = useRef(createOptions);
   const initDoneRef = useRef(false);
+  // Store createOptions in ref so the effect can read it without being a dependency
+  const createOptionsRef = useRef(createOptions);
+  createOptionsRef.current = createOptions;
 
   const [identity, setIdentity] = useState<Identity | undefined>(undefined);
   const [loginStatus, setStatus] = useState<Status>("initializing");
@@ -122,9 +122,7 @@ export function InternetIdentityProvider({
   const login = useCallback(() => {
     const client = authClientRef.current;
     if (!client) {
-      setErrorMessage(
-        "AuthClient is not initialized yet, make sure to call `login` on user interaction e.g. click.",
-      );
+      setErrorMessage("AuthClient is not initialized yet.");
       return;
     }
 
@@ -159,9 +157,9 @@ export function InternetIdentityProvider({
     void client
       .logout()
       .then(() => {
+        setIdentity(undefined);
         authClientRef.current = undefined;
         initDoneRef.current = false;
-        setIdentity(undefined);
         setStatus("idle");
         setError(undefined);
       })
@@ -175,34 +173,42 @@ export function InternetIdentityProvider({
       });
   }, [setErrorMessage]);
 
-  // Empty dependency array -- runs exactly ONCE on mount, never again
+  // CRITICAL: empty dependency array — runs exactly once on mount
+  // createOptions is read via ref to avoid being a dependency
   useEffect(() => {
     if (initDoneRef.current) return;
     initDoneRef.current = true;
 
+    let cancelled = false;
     void (async () => {
       try {
         setStatus("initializing");
         const client = await createAuthClient(createOptionsRef.current);
+        if (cancelled) return;
         authClientRef.current = client;
         const isAuthenticated = await client.isAuthenticated();
+        if (cancelled) return;
         if (isAuthenticated) {
           const loadedIdentity = client.getIdentity();
           setIdentity(loadedIdentity);
         }
       } catch (unknownError) {
-        setStatus("loginError");
-        setError(
-          unknownError instanceof Error
-            ? unknownError
-            : new Error("Initialization failed"),
-        );
+        if (!cancelled) {
+          setStatus("loginError");
+          setError(
+            unknownError instanceof Error
+              ? unknownError
+              : new Error("Initialization failed"),
+          );
+        }
       } finally {
-        setStatus("idle");
+        if (!cancelled) setStatus("idle");
       }
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, []); // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally empty 2014 runs once on mount
 
   const value = useMemo<ProviderValue>(
     () => ({

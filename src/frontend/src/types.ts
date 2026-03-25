@@ -4,7 +4,8 @@ export type Page =
   | "edit-rkh"
   | "riwayat"
   | "profil"
-  | "admin";
+  | "admin"
+  | "upload-lampiran";
 
 export interface NavItem {
   page: Page;

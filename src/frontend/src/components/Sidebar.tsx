@@ -3,6 +3,7 @@ import {
   History,
   LayoutDashboard,
   Lock,
+  Paperclip,
   Shield,
   User,
 } from "lucide-react";
@@ -25,6 +26,11 @@ const navItems: { page: Page; label: string; icon: React.ReactNode }[] = [
     page: "input-rkh",
     label: "Input Laporan (RKH)",
     icon: <FilePlus size={16} />,
+  },
+  {
+    page: "upload-lampiran",
+    label: "Upload Lampiran",
+    icon: <Paperclip size={16} />,
   },
   { page: "riwayat", label: "Riwayat Laporan", icon: <History size={16} /> },
   { page: "profil", label: "Profil Saya", icon: <User size={16} /> },
