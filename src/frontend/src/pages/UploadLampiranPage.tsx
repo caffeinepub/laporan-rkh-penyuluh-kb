@@ -3,9 +3,11 @@ import { HttpAgent } from "@icp-sdk/core/agent";
 import {
   CheckCircle2,
   FileText,
+  GitMerge,
   Image,
   Loader2,
   Paperclip,
+  UploadCloud,
   X,
 } from "lucide-react";
 import { useRef, useState } from "react";
@@ -48,13 +50,40 @@ const YEARS = Array.from({ length: 5 }, (_, i) =>
   (currentYear - 2 + i).toString(),
 );
 
-interface RowUploadState {
+interface UploadedFile {
+  name: string;
+  url: string;
+  type: string;
+  size: number;
+}
+
+interface RowState {
+  // Step 1: file selection
   dokumenFile: File | null;
   gambarFile: File | null;
-  isUploading: boolean;
+  // Step 1: uploading individual files
+  uploadingDokumen: boolean;
+  uploadingGambar: boolean;
   dokumenProgress: number;
   gambarProgress: number;
+  // Step 2: uploaded results (ready to merge)
+  uploadedDokumen: UploadedFile | null;
+  uploadedGambar: UploadedFile | null;
+  // Step 2: merging
+  isMerging: boolean;
 }
+
+const emptyRowState = (): RowState => ({
+  dokumenFile: null,
+  gambarFile: null,
+  uploadingDokumen: false,
+  uploadingGambar: false,
+  dokumenProgress: 0,
+  gambarProgress: 0,
+  uploadedDokumen: null,
+  uploadedGambar: null,
+  isMerging: false,
+});
 
 export default function UploadLampiranPage({
   onNavigate: _onNavigate,
@@ -75,17 +104,8 @@ export default function UploadLampiranPage({
   });
   const updateMutation = useUpdateReport();
 
-  // Which row is expanded for upload
   const [expandedId, setExpandedId] = useState<bigint | null>(null);
-
-  // Per-row upload state
-  const [rowState, setRowState] = useState<RowUploadState>({
-    dokumenFile: null,
-    gambarFile: null,
-    isUploading: false,
-    dokumenProgress: 0,
-    gambarProgress: 0,
-  });
+  const [rowState, setRowState] = useState<RowState>(emptyRowState());
 
   const dokumenRef = useRef<HTMLInputElement>(null);
   const gambarRef = useRef<HTMLInputElement>(null);
@@ -95,13 +115,7 @@ export default function UploadLampiranPage({
       setExpandedId(null);
     } else {
       setExpandedId(reportId);
-      setRowState({
-        dokumenFile: null,
-        gambarFile: null,
-        isUploading: false,
-        dokumenProgress: 0,
-        gambarProgress: 0,
-      });
+      setRowState(emptyRowState());
     }
   };
 
@@ -120,71 +134,135 @@ export default function UploadLampiranPage({
     if (gambarRef.current) gambarRef.current.value = "";
   };
 
-  const handleUpload = async (report: RKHReport) => {
-    if (!rowState.dokumenFile && !rowState.gambarFile) {
-      toast.error("Pilih minimal satu file untuk diunggah.");
-      return;
-    }
+  const makeStorageClient = async () => {
+    const config = await loadConfig();
+    const currentIdentity = identityRef.current;
+    if (!currentIdentity)
+      throw new Error("Sesi login tidak ditemukan. Silakan login ulang.");
+    const agent = new HttpAgent({
+      host: config.backend_host,
+      identity: currentIdentity,
+    });
+    return new StorageClient(
+      config.bucket_name,
+      config.storage_gateway_url,
+      config.backend_canister_id,
+      config.project_id,
+      agent,
+    );
+  };
+
+  // Step 1a: Upload dokumen only
+  const handleUploadDokumen = async () => {
+    if (!rowState.dokumenFile) return;
     setRowState((s) => ({
       ...s,
-      isUploading: true,
+      uploadingDokumen: true,
       dokumenProgress: 0,
+    }));
+    try {
+      const storageClient = await makeStorageClient();
+      const bytes = new Uint8Array(await rowState.dokumenFile.arrayBuffer());
+      const { hash } = await storageClient.putFile(bytes, (p) =>
+        setRowState((s) => ({ ...s, dokumenProgress: p })),
+      );
+      const url = await storageClient.getDirectURL(hash);
+      setRowState((s) => ({
+        ...s,
+        uploadedDokumen: {
+          name: s.dokumenFile!.name,
+          url,
+          type: "dokumen",
+          size: s.dokumenFile!.size,
+        },
+        dokumenFile: null,
+        uploadingDokumen: false,
+      }));
+      toast.success("Dokumen berhasil diunggah!");
+    } catch (err) {
+      console.error("Upload dokumen error:", err);
+      const msg =
+        err instanceof Error ? err.message : "Gagal mengunggah dokumen.";
+      toast.error(msg);
+      setRowState((s) => ({ ...s, uploadingDokumen: false }));
+    }
+  };
+
+  // Step 1b: Upload gambar only
+  const handleUploadGambar = async () => {
+    if (!rowState.gambarFile) return;
+    setRowState((s) => ({
+      ...s,
+      uploadingGambar: true,
       gambarProgress: 0,
     }));
     try {
-      const config = await loadConfig();
-      const currentIdentity = identityRef.current;
-      if (!currentIdentity)
-        throw new Error("Sesi login tidak ditemukan. Silakan login ulang.");
-
-      const agent = new HttpAgent({
-        host: config.backend_host,
-        identity: currentIdentity,
-      });
-      const storageClient = new StorageClient(
-        config.bucket_name,
-        config.storage_gateway_url,
-        config.backend_canister_id,
-        config.project_id,
-        agent,
+      const storageClient = await makeStorageClient();
+      const bytes = new Uint8Array(await rowState.gambarFile.arrayBuffer());
+      const { hash } = await storageClient.putFile(bytes, (p) =>
+        setRowState((s) => ({ ...s, gambarProgress: p })),
       );
+      const url = await storageClient.getDirectURL(hash);
+      setRowState((s) => ({
+        ...s,
+        uploadedGambar: {
+          name: s.gambarFile!.name,
+          url,
+          type: "gambar",
+          size: s.gambarFile!.size,
+        },
+        gambarFile: null,
+        uploadingGambar: false,
+      }));
+      toast.success("Gambar berhasil diunggah!");
+    } catch (err) {
+      console.error("Upload gambar error:", err);
+      const msg =
+        err instanceof Error ? err.message : "Gagal mengunggah gambar.";
+      toast.error(msg);
+      setRowState((s) => ({ ...s, uploadingGambar: false }));
+    }
+  };
 
+  // Step 2: Merge uploaded files with report (lightweight -- no file transfer)
+  const handleMerge = async (report: RKHReport) => {
+    const { uploadedDokumen, uploadedGambar } = rowState;
+    if (!uploadedDokumen && !uploadedGambar) {
+      toast.error("Upload minimal satu file terlebih dahulu.");
+      return;
+    }
+    setRowState((s) => ({ ...s, isMerging: true }));
+    try {
       const results: { name: string; url: string; type: string }[] = [];
-
-      if (rowState.dokumenFile) {
-        const bytes = new Uint8Array(await rowState.dokumenFile.arrayBuffer());
-        const { hash } = await storageClient.putFile(bytes, (p) =>
-          setRowState((s) => ({ ...s, dokumenProgress: p })),
-        );
-        const url = await storageClient.getDirectURL(hash);
-        results.push({ name: rowState.dokumenFile.name, url, type: "dokumen" });
-      }
-
-      if (rowState.gambarFile) {
-        const bytes = new Uint8Array(await rowState.gambarFile.arrayBuffer());
-        const { hash } = await storageClient.putFile(bytes, (p) =>
-          setRowState((s) => ({ ...s, gambarProgress: p })),
-        );
-        const url = await storageClient.getDirectURL(hash);
-        results.push({ name: rowState.gambarFile.name, url, type: "gambar" });
-      }
-
+      if (uploadedDokumen)
+        results.push({
+          name: uploadedDokumen.name,
+          url: uploadedDokumen.url,
+          type: "dokumen",
+        });
+      if (uploadedGambar)
+        results.push({
+          name: uploadedGambar.name,
+          url: uploadedGambar.url,
+          type: "gambar",
+        });
       const lampiranStr = JSON.stringify(results);
       const updatedReport: RKHReport = { ...report, lampiran: lampiranStr };
       await updateMutation.mutateAsync(updatedReport);
-      toast.success("Lampiran berhasil disimpan!");
+      toast.success("Lampiran berhasil digabungkan ke laporan!");
       setExpandedId(null);
     } catch (err) {
-      console.error("Upload lampiran error:", err);
+      console.error("Merge error:", err);
       const msg =
-        err instanceof Error ? err.message : "Gagal mengunggah lampiran.";
-      toast.error(`${msg} Silakan coba lagi.`);
-    } finally {
-      setRowState((s) => ({ ...s, isUploading: false }));
+        err instanceof Error ? err.message : "Gagal menggabungkan lampiran.";
+      toast.error(msg);
+      setRowState((s) => ({ ...s, isMerging: false }));
     }
   };
 
   const hasLampiran = (report: RKHReport) => !!report.lampiran;
+  const hasUploaded = rowState.uploadedDokumen || rowState.uploadedGambar;
+  const isAnyUploading = rowState.uploadingDokumen || rowState.uploadingGambar;
 
   return (
     <div className="bg-white rounded-lg shadow-card">
@@ -200,7 +278,7 @@ export default function UploadLampiranPage({
           <h2 className="text-base font-bold text-white">Upload Lampiran</h2>
         </div>
         <p className="text-white/70 text-xs mt-0.5">
-          Upload dokumen dan foto untuk setiap laporan RKH
+          Upload file terlebih dahulu, lalu gabungkan ke laporan
         </p>
       </div>
 
@@ -333,205 +411,346 @@ export default function UploadLampiranPage({
                         onClick={() => handleOpenRow(report.id)}
                         className="text-xs h-7 px-3"
                       >
-                        {expandedId === report.id ? "Tutup" : "Upload Lampiran"}
+                        {expandedId === report.id ? "Tutup" : "Upload"}
                       </Button>
                     </td>
                   </tr>
 
-                  {/* Expanded upload panel */}
+                  {/* Expanded panel -- two separate steps */}
                   {expandedId === report.id && (
                     <tr key={`upload-${report.id.toString()}`}>
-                      <td colSpan={5} className="px-4 pb-4 bg-green-50/30">
-                        <div className="border border-green-200 rounded-lg p-4 space-y-3">
-                          <p className="text-xs font-semibold text-gray-600 mb-3">
-                            Upload lampiran untuk laporan tanggal{" "}
+                      <td colSpan={5} className="px-4 pb-4 bg-green-50/20">
+                        <div className="border border-green-200 rounded-lg p-4 space-y-4 mt-1">
+                          <p className="text-xs font-semibold text-gray-600">
+                            Laporan:{" "}
                             <span className="text-green-700">
                               {report.tanggal}
                             </span>
                           </p>
 
-                          {/* Dokumen */}
-                          <div className="border border-gray-200 rounded-lg p-3 bg-white">
-                            <div className="flex items-center gap-2 mb-2">
-                              <FileText size={15} className="text-red-500" />
-                              <span className="text-sm font-medium text-gray-700">
-                                Dokumen / PDF
-                              </span>
-                              <span className="text-xs text-gray-400">
-                                (maks. 1 file)
-                              </span>
-                            </div>
-                            {rowState.dokumenFile ? (
-                              <div className="flex items-center gap-3 bg-gray-50 rounded-md px-3 py-2">
-                                <FileText
-                                  size={15}
-                                  className="text-red-500 shrink-0"
-                                />
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm text-gray-700 truncate">
-                                    {rowState.dokumenFile.name}
-                                  </p>
-                                  <p className="text-xs text-gray-400">
-                                    {formatFileSize(rowState.dokumenFile.size)}
-                                  </p>
-                                  {rowState.isUploading &&
-                                    rowState.dokumenProgress > 0 && (
-                                      <div className="mt-1 h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
-                                        <div
-                                          className="h-full bg-green-500 rounded-full transition-all"
-                                          style={{
-                                            width: `${rowState.dokumenProgress}%`,
-                                          }}
-                                        />
-                                      </div>
-                                    )}
-                                </div>
-                                {!rowState.isUploading && (
+                          {/* ── STEP 1: Upload files independently ── */}
+                          <div className="space-y-3">
+                            <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">
+                              Langkah 1 — Upload File
+                            </p>
+
+                            {/* Dokumen */}
+                            <div className="border border-gray-200 rounded-lg p-3 bg-white">
+                              <div className="flex items-center gap-2 mb-2">
+                                <FileText size={14} className="text-red-500" />
+                                <span className="text-sm font-medium text-gray-700">
+                                  Dokumen / PDF
+                                </span>
+                              </div>
+
+                              {rowState.uploadedDokumen ? (
+                                <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-md px-3 py-2">
+                                  <CheckCircle2
+                                    size={14}
+                                    className="text-green-600 shrink-0"
+                                  />
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-xs text-gray-700 truncate font-medium">
+                                      {rowState.uploadedDokumen.name}
+                                    </p>
+                                    <p className="text-xs text-green-600">
+                                      Terupload —{" "}
+                                      {formatFileSize(
+                                        rowState.uploadedDokumen.size,
+                                      )}
+                                    </p>
+                                  </div>
                                   <button
                                     type="button"
                                     onClick={() =>
                                       setRowState((s) => ({
                                         ...s,
-                                        dokumenFile: null,
+                                        uploadedDokumen: null,
                                       }))
                                     }
-                                    className="shrink-0 p-1 rounded hover:bg-gray-200 text-gray-400 hover:text-red-500 transition-colors"
+                                    className="p-1 rounded hover:bg-gray-200 text-gray-400 hover:text-red-500"
                                   >
-                                    <X size={14} />
+                                    <X size={13} />
                                   </button>
-                                )}
-                              </div>
-                            ) : (
-                              <label
-                                htmlFor={`dok-${report.id.toString()}`}
-                                className="flex items-center gap-3 border border-dashed border-gray-300 rounded-md px-3 py-2.5 cursor-pointer hover:border-green-400 hover:bg-green-50/30 transition-colors"
-                              >
-                                <FileText size={15} className="text-gray-400" />
-                                <span className="text-sm text-gray-500">
-                                  Pilih file PDF atau dokumen
-                                </span>
-                                <input
-                                  ref={dokumenRef}
-                                  id={`dok-${report.id.toString()}`}
-                                  type="file"
-                                  accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                                  className="hidden"
-                                  onChange={handleDokumenChange}
-                                  disabled={rowState.isUploading}
-                                />
-                              </label>
-                            )}
-                          </div>
-
-                          {/* Gambar */}
-                          <div className="border border-gray-200 rounded-lg p-3 bg-white">
-                            <div className="flex items-center gap-2 mb-2">
-                              <Image size={15} className="text-blue-500" />
-                              <span className="text-sm font-medium text-gray-700">
-                                Gambar / Foto
-                              </span>
-                              <span className="text-xs text-gray-400">
-                                (maks. 1 file, otomatis dikecilkan)
-                              </span>
-                            </div>
-                            {rowState.gambarFile ? (
-                              <div className="flex items-center gap-3 bg-gray-50 rounded-md px-3 py-2">
-                                <Image
-                                  size={15}
-                                  className="text-blue-500 shrink-0"
-                                />
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm text-gray-700 truncate">
-                                    {rowState.gambarFile.name}
-                                  </p>
-                                  <p className="text-xs text-gray-400">
-                                    {formatFileSize(rowState.gambarFile.size)}
-                                    <span className="ml-1 text-green-500">
-                                      (dikompres)
-                                    </span>
-                                  </p>
-                                  {rowState.isUploading &&
-                                    rowState.gambarProgress > 0 && (
-                                      <div className="mt-1 h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
-                                        <div
-                                          className="h-full bg-blue-500 rounded-full transition-all"
-                                          style={{
-                                            width: `${rowState.gambarProgress}%`,
-                                          }}
-                                        />
-                                      </div>
-                                    )}
                                 </div>
-                                {!rowState.isUploading && (
+                              ) : rowState.dokumenFile ? (
+                                <div className="flex items-center gap-2">
+                                  <div className="flex-1 min-w-0 bg-gray-50 rounded-md px-3 py-2">
+                                    <p className="text-xs text-gray-700 truncate">
+                                      {rowState.dokumenFile.name}
+                                    </p>
+                                    <p className="text-xs text-gray-400">
+                                      {formatFileSize(
+                                        rowState.dokumenFile.size,
+                                      )}
+                                    </p>
+                                    {rowState.uploadingDokumen &&
+                                      rowState.dokumenProgress > 0 && (
+                                        <div className="mt-1 h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
+                                          <div
+                                            className="h-full bg-green-500 rounded-full transition-all"
+                                            style={{
+                                              width: `${rowState.dokumenProgress}%`,
+                                            }}
+                                          />
+                                        </div>
+                                      )}
+                                  </div>
+                                  <Button
+                                    size="sm"
+                                    disabled={rowState.uploadingDokumen}
+                                    onClick={handleUploadDokumen}
+                                    className="text-white text-xs shrink-0"
+                                    style={{ backgroundColor: "#2E7D5B" }}
+                                  >
+                                    {rowState.uploadingDokumen ? (
+                                      <Loader2
+                                        size={12}
+                                        className="animate-spin mr-1"
+                                      />
+                                    ) : (
+                                      <UploadCloud size={12} className="mr-1" />
+                                    )}
+                                    {rowState.uploadingDokumen
+                                      ? "Uploading..."
+                                      : "Upload"}
+                                  </Button>
+                                  {!rowState.uploadingDokumen && (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setRowState((s) => ({
+                                          ...s,
+                                          dokumenFile: null,
+                                        }))
+                                      }
+                                      className="p-1 rounded hover:bg-gray-200 text-gray-400 hover:text-red-500"
+                                    >
+                                      <X size={13} />
+                                    </button>
+                                  )}
+                                </div>
+                              ) : (
+                                <label
+                                  htmlFor={`dok-${report.id.toString()}`}
+                                  className="flex items-center gap-2 border border-dashed border-gray-300 rounded-md px-3 py-2.5 cursor-pointer hover:border-green-400 hover:bg-green-50/30 transition-colors"
+                                >
+                                  <FileText
+                                    size={14}
+                                    className="text-gray-400"
+                                  />
+                                  <span className="text-sm text-gray-500">
+                                    Pilih file PDF / dokumen
+                                  </span>
+                                  <input
+                                    ref={dokumenRef}
+                                    id={`dok-${report.id.toString()}`}
+                                    type="file"
+                                    accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                                    className="hidden"
+                                    onChange={handleDokumenChange}
+                                    disabled={isAnyUploading}
+                                  />
+                                </label>
+                              )}
+                            </div>
+
+                            {/* Gambar */}
+                            <div className="border border-gray-200 rounded-lg p-3 bg-white">
+                              <div className="flex items-center gap-2 mb-2">
+                                <Image size={14} className="text-blue-500" />
+                                <span className="text-sm font-medium text-gray-700">
+                                  Gambar / Foto
+                                </span>
+                                <span className="text-xs text-gray-400">
+                                  (otomatis dikecilkan)
+                                </span>
+                              </div>
+
+                              {rowState.uploadedGambar ? (
+                                <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-md px-3 py-2">
+                                  <CheckCircle2
+                                    size={14}
+                                    className="text-blue-600 shrink-0"
+                                  />
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-xs text-gray-700 truncate font-medium">
+                                      {rowState.uploadedGambar.name}
+                                    </p>
+                                    <p className="text-xs text-blue-600">
+                                      Terupload —{" "}
+                                      {formatFileSize(
+                                        rowState.uploadedGambar.size,
+                                      )}
+                                    </p>
+                                  </div>
                                   <button
                                     type="button"
                                     onClick={() =>
                                       setRowState((s) => ({
                                         ...s,
-                                        gambarFile: null,
+                                        uploadedGambar: null,
                                       }))
                                     }
-                                    className="shrink-0 p-1 rounded hover:bg-gray-200 text-gray-400 hover:text-red-500 transition-colors"
+                                    className="p-1 rounded hover:bg-gray-200 text-gray-400 hover:text-red-500"
                                   >
-                                    <X size={14} />
+                                    <X size={13} />
                                   </button>
+                                </div>
+                              ) : rowState.gambarFile ? (
+                                <div className="flex items-center gap-2">
+                                  <div className="flex-1 min-w-0 bg-gray-50 rounded-md px-3 py-2">
+                                    <p className="text-xs text-gray-700 truncate">
+                                      {rowState.gambarFile.name}
+                                    </p>
+                                    <p className="text-xs text-gray-400">
+                                      {formatFileSize(rowState.gambarFile.size)}
+                                      <span className="ml-1 text-green-500">
+                                        (dikompres)
+                                      </span>
+                                    </p>
+                                    {rowState.uploadingGambar &&
+                                      rowState.gambarProgress > 0 && (
+                                        <div className="mt-1 h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
+                                          <div
+                                            className="h-full bg-blue-500 rounded-full transition-all"
+                                            style={{
+                                              width: `${rowState.gambarProgress}%`,
+                                            }}
+                                          />
+                                        </div>
+                                      )}
+                                  </div>
+                                  <Button
+                                    size="sm"
+                                    disabled={rowState.uploadingGambar}
+                                    onClick={handleUploadGambar}
+                                    className="text-xs shrink-0"
+                                    style={{
+                                      backgroundColor: "#1D6FA4",
+                                      color: "white",
+                                    }}
+                                  >
+                                    {rowState.uploadingGambar ? (
+                                      <Loader2
+                                        size={12}
+                                        className="animate-spin mr-1"
+                                      />
+                                    ) : (
+                                      <UploadCloud size={12} className="mr-1" />
+                                    )}
+                                    {rowState.uploadingGambar
+                                      ? "Uploading..."
+                                      : "Upload"}
+                                  </Button>
+                                  {!rowState.uploadingGambar && (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setRowState((s) => ({
+                                          ...s,
+                                          gambarFile: null,
+                                        }))
+                                      }
+                                      className="p-1 rounded hover:bg-gray-200 text-gray-400 hover:text-red-500"
+                                    >
+                                      <X size={13} />
+                                    </button>
+                                  )}
+                                </div>
+                              ) : (
+                                <label
+                                  htmlFor={`img-${report.id.toString()}`}
+                                  className="flex items-center gap-2 border border-dashed border-gray-300 rounded-md px-3 py-2.5 cursor-pointer hover:border-blue-400 hover:bg-blue-50/30 transition-colors"
+                                >
+                                  <Image size={14} className="text-gray-400" />
+                                  <span className="text-sm text-gray-500">
+                                    Pilih file gambar / foto
+                                  </span>
+                                  <input
+                                    ref={gambarRef}
+                                    id={`img-${report.id.toString()}`}
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={handleGambarChange}
+                                    disabled={isAnyUploading}
+                                  />
+                                </label>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* ── STEP 2: Merge into report ── */}
+                          <div
+                            className={`border rounded-lg p-3 transition-all ${
+                              hasUploaded
+                                ? "border-green-300 bg-green-50/40"
+                                : "border-gray-200 bg-gray-50/40 opacity-50"
+                            }`}
+                          >
+                            <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
+                              Langkah 2 — Gabungkan ke Laporan
+                            </p>
+                            {hasUploaded ? (
+                              <div className="space-y-1 mb-3">
+                                {rowState.uploadedDokumen && (
+                                  <div className="flex items-center gap-1.5 text-xs text-gray-600">
+                                    <CheckCircle2
+                                      size={12}
+                                      className="text-green-500"
+                                    />
+                                    Dokumen siap:{" "}
+                                    {rowState.uploadedDokumen.name}
+                                  </div>
+                                )}
+                                {rowState.uploadedGambar && (
+                                  <div className="flex items-center gap-1.5 text-xs text-gray-600">
+                                    <CheckCircle2
+                                      size={12}
+                                      className="text-blue-500"
+                                    />
+                                    Gambar siap: {rowState.uploadedGambar.name}
+                                  </div>
                                 )}
                               </div>
                             ) : (
-                              <label
-                                htmlFor={`img-${report.id.toString()}`}
-                                className="flex items-center gap-3 border border-dashed border-gray-300 rounded-md px-3 py-2.5 cursor-pointer hover:border-blue-400 hover:bg-blue-50/30 transition-colors"
-                              >
-                                <Image size={15} className="text-gray-400" />
-                                <span className="text-sm text-gray-500">
-                                  Pilih file gambar / foto
-                                </span>
-                                <input
-                                  ref={gambarRef}
-                                  id={`img-${report.id.toString()}`}
-                                  type="file"
-                                  accept="image/*"
-                                  className="hidden"
-                                  onChange={handleGambarChange}
-                                  disabled={rowState.isUploading}
-                                />
-                              </label>
+                              <p className="text-xs text-gray-400 mb-3">
+                                Upload minimal satu file di atas dulu.
+                              </p>
                             )}
-                          </div>
-
-                          {/* Actions */}
-                          <div className="flex gap-2 pt-1">
-                            <Button
-                              size="sm"
-                              data-ocid="upload_lampiran.submit_button"
-                              disabled={
-                                rowState.isUploading ||
-                                (!rowState.dokumenFile && !rowState.gambarFile)
-                              }
-                              onClick={() => handleUpload(report)}
-                              className="text-white text-xs font-semibold"
-                              style={{ backgroundColor: "#2E7D5B" }}
-                            >
-                              {rowState.isUploading ? (
-                                <Loader2
-                                  size={13}
-                                  className="animate-spin mr-1.5"
-                                />
-                              ) : null}
-                              {rowState.isUploading
-                                ? "Mengunggah..."
-                                : "Simpan Lampiran"}
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              data-ocid="upload_lampiran.cancel_button"
-                              onClick={() => setExpandedId(null)}
-                              disabled={rowState.isUploading}
-                              className="text-xs"
-                            >
-                              Batal
-                            </Button>
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                data-ocid="upload_lampiran.merge_button"
+                                disabled={!hasUploaded || rowState.isMerging}
+                                onClick={() => handleMerge(report)}
+                                className="text-white text-xs font-semibold"
+                                style={{ backgroundColor: "#2E7D5B" }}
+                              >
+                                {rowState.isMerging ? (
+                                  <Loader2
+                                    size={12}
+                                    className="animate-spin mr-1.5"
+                                  />
+                                ) : (
+                                  <GitMerge size={12} className="mr-1.5" />
+                                )}
+                                {rowState.isMerging
+                                  ? "Menggabungkan..."
+                                  : "Gabungkan ke Laporan"}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                data-ocid="upload_lampiran.cancel_button"
+                                onClick={() => setExpandedId(null)}
+                                disabled={isAnyUploading || rowState.isMerging}
+                                className="text-xs"
+                              >
+                                Batal
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       </td>
