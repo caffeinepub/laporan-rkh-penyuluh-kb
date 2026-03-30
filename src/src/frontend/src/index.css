@@ -1,0 +1,86 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --radius: 0.5rem;
+    /* Page bg: #F4F6F8 */
+    --background: 0.968 0.004 240;
+    /* Dark text */
+    --foreground: 0.18 0.02 228;
+    /* White card */
+    --card: 1 0 0;
+    --card-foreground: 0.18 0.02 228;
+    --popover: 1 0 0;
+    --popover-foreground: 0.18 0.02 228;
+    /* Brand green #2E7D5B */
+    --primary: 0.52 0.13 155;
+    --primary-foreground: 1 0 0;
+    /* Secondary */
+    --secondary: 0.96 0.004 240;
+    --secondary-foreground: 0.18 0.02 228;
+    /* Muted */
+    --muted: 0.96 0.004 240;
+    --muted-foreground: 0.555 0.02 240;
+    /* Accent: pale green #E7F4EE */
+    --accent: 0.955 0.035 155;
+    --accent-foreground: 0.52 0.13 155;
+    /* Destructive */
+    --destructive: 0.577 0.245 27.325;
+    --destructive-foreground: 1 0 0;
+    /* Border #E3E7EB */
+    --border: 0.912 0.008 240;
+    --input: 0.912 0.008 240;
+    --ring: 0.52 0.13 155;
+    --chart-1: 0.52 0.13 155;
+    --chart-2: 0.6 0.118 184.704;
+    --chart-3: 0.398 0.07 227.392;
+    --chart-4: 0.828 0.189 84.429;
+    --chart-5: 0.769 0.188 70.08;
+    --sidebar: 1 0 0;
+    --sidebar-foreground: 0.18 0.02 228;
+    --sidebar-primary: 0.52 0.13 155;
+    --sidebar-primary-foreground: 1 0 0;
+    --sidebar-accent: 0.955 0.035 155;
+    --sidebar-accent-foreground: 0.52 0.13 155;
+    --sidebar-border: 0.912 0.008 240;
+    --sidebar-ring: 0.52 0.13 155;
+  }
+
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: "Inter", system-ui, sans-serif;
+  }
+}
+
+/* Print styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+  body {
+    background: white !important;
+    font-size: 11pt;
+  }
+  .print-container {
+    width: 100%;
+    max-width: 100%;
+    padding: 0;
+    margin: 0;
+  }
+  @page {
+    margin: 1.5cm 2cm;
+    size: A4;
+  }
+}
+
+.print-only {
+  display: none;
+}

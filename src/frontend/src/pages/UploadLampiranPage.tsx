@@ -13,12 +13,13 @@ import {
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import type { RKHReport } from "../backend.d";
-import { loadConfig } from "../config";
+import { createActorWithConfig, loadConfig } from "../config";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
-import { useQueryRKHReports, useUpdateReport } from "../hooks/useQueries";
+import { useQueryRKHReports } from "../hooks/useQueries";
 import type { Page } from "../types";
 import { StorageClient } from "../utils/StorageClient";
 import { compressFile } from "../utils/compressFile";
+import { getSecretParameter } from "../utils/urlParams";
 
 interface UploadLampiranPageProps {
   onNavigate: (page: Page) => void;
@@ -102,7 +103,6 @@ export default function UploadLampiranPage({
     bulan,
     tahun,
   });
-  const updateMutation = useUpdateReport();
 
   const [expandedId, setExpandedId] = useState<bigint | null>(null);
   const [rowState, setRowState] = useState<RowState>(emptyRowState());
@@ -224,11 +224,16 @@ export default function UploadLampiranPage({
     }
   };
 
-  // Step 2: Merge uploaded files with report (lightweight -- no file transfer)
+  // Step 2: Merge uploaded files with report -- uses direct actor (same pattern as upload)
   const handleMerge = async (report: RKHReport) => {
     const { uploadedDokumen, uploadedGambar } = rowState;
     if (!uploadedDokumen && !uploadedGambar) {
       toast.error("Upload minimal satu file terlebih dahulu.");
+      return;
+    }
+    const currentIdentity = identityRef.current;
+    if (!currentIdentity) {
+      toast.error("Sesi login tidak ditemukan. Silakan login ulang.");
       return;
     }
     setRowState((s) => ({ ...s, isMerging: true }));
@@ -248,7 +253,15 @@ export default function UploadLampiranPage({
         });
       const lampiranStr = JSON.stringify(results);
       const updatedReport: RKHReport = { ...report, lampiran: lampiranStr };
-      await updateMutation.mutateAsync(updatedReport);
+
+      // Create actor directly with current identity (bypass React Query)
+      const actor = await createActorWithConfig({
+        agentOptions: { identity: currentIdentity },
+      });
+      const adminToken = getSecretParameter("caffeineAdminToken") || "";
+      await actor._initializeAccessControlWithSecret(adminToken);
+      await actor.updateReport([updatedReport]);
+
       toast.success("Lampiran berhasil digabungkan ke laporan!");
       setExpandedId(null);
     } catch (err) {
