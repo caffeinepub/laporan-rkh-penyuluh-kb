@@ -62,7 +62,7 @@ async function createAuthClient(
     },
     ...createOptions,
   };
-  return AuthClient.create(options);
+  return await AuthClient.create(options);
 }
 
 function assertProviderPresent(
@@ -88,13 +88,10 @@ export function InternetIdentityProvider({
   children: ReactNode;
   createOptions?: AuthClientCreateOptions;
 }>) {
-  // Store authClient in a ref -- NEVER in state -- so it never triggers re-renders
+  // Use refs for authClient and createOptions so they NEVER trigger re-renders
   const authClientRef = useRef<AuthClient | undefined>(undefined);
-  // Guard: ensure initialization runs exactly once
-  const initDoneRef = useRef(false);
-  // Store createOptions in ref so it doesn't appear in useEffect deps
   const createOptionsRef = useRef(createOptions);
-  createOptionsRef.current = createOptions;
+  const initDoneRef = useRef(false);
 
   const [identity, setIdentity] = useState<Identity | undefined>(undefined);
   const [loginStatus, setStatus] = useState<Status>("initializing");
@@ -163,9 +160,9 @@ export function InternetIdentityProvider({
     void client
       .logout()
       .then(() => {
+        setIdentity(undefined);
         authClientRef.current = undefined;
         initDoneRef.current = false;
-        setIdentity(undefined);
         setStatus("idle");
         setError(undefined);
       })
@@ -179,7 +176,7 @@ export function InternetIdentityProvider({
       });
   }, [setErrorMessage]);
 
-  // CRITICAL: empty dependency array [] -- this must NEVER re-run
+  // Empty dependency array -- runs EXACTLY once on mount, never again
   useEffect(() => {
     if (initDoneRef.current) return;
     initDoneRef.current = true;
@@ -189,12 +186,12 @@ export function InternetIdentityProvider({
         setStatus("initializing");
         const client = await createAuthClient(createOptionsRef.current);
         authClientRef.current = client;
+
         const isAuthenticated = await client.isAuthenticated();
         if (isAuthenticated) {
           const loadedIdentity = client.getIdentity();
           setIdentity(loadedIdentity);
         }
-        setStatus("idle");
       } catch (unknownError) {
         setStatus("loginError");
         setError(
@@ -202,9 +199,11 @@ export function InternetIdentityProvider({
             ? unknownError
             : new Error("Initialization failed"),
         );
+      } finally {
+        setStatus("idle");
       }
     })();
-  }, []); // empty array: runs ONCE, no re-runs ever
+  }, []); // <-- EMPTY: never re-runs
 
   const value = useMemo<ProviderValue>(
     () => ({
